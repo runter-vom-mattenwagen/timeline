@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline Visualizer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.5/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f9fb;
+      --bg-card: #ffffff;
+      --bg-hover: #f1f3f7;
+      --border: #e2e5ea;
+      --border-light: #eef0f4;
+      --text: #1a1d23;
+      --text-secondary: #5f6470;
+      --text-muted: #8b8f9a;
+      --accent: #3b5bdb;
+      --accent-hover: #2b4bc8;
+      --accent-light: #eef1fb;
+      --danger: #e03131;
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+      --radius: 6px;
+      --radius-lg: 10px;
+      --font: 'DM Sans', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --svg-bg: #fff; --svg-lane-even: #fafbfc; --svg-lane-odd: #fff;
+      --svg-grid: #f1f3f5; --svg-grid-month: #dee2e6; --svg-header-text: #5f6470;
+      --svg-day-text: #868e96; --svg-day-we: #adb5bd; --svg-day-name: #adb5bd; --svg-day-name-we: #c5cad3;
+      --svg-label-text: #1a1d23; --svg-label-sep: #e9ecef; --svg-lane-sep: #f1f3f5; --svg-we-bg: rgba(0,0,0,0.025);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111318; --bg-card: #1a1d24; --bg-hover: #252830;
+        --border: #2e3240; --border-light: #23272f;
+        --text: #e4e6eb; --text-secondary: #9ca0ab; --text-muted: #6b7080;
+        --accent: #5b7bf5; --accent-hover: #7b95ff; --accent-light: #1e2540;
+        --danger: #ff6b6b;
+        --shadow-md: 0 4px 12px rgba(0,0,0,0.4); --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+        --svg-bg: #1a1d24; --svg-lane-even: #1e2128; --svg-lane-odd: #1a1d24;
+        --svg-grid: #252830; --svg-grid-month: #353a48; --svg-header-text: #9ca0ab;
+        --svg-day-text: #6b7080; --svg-day-we: #4a4f5c; --svg-day-name: #555a68; --svg-day-name-we: #3e4350;
+        --svg-label-text: #e4e6eb; --svg-label-sep: #2e3240; --svg-lane-sep: #252830; --svg-we-bg: rgba(255,255,255,0.025);
+      }
+    }
+
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; overflow: hidden; height: 100vh; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); font-family: var(--font); font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .btn:hover { background: var(--bg-hover); border-color: var(--text-muted); }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-danger { color: var(--danger); }
+    .btn-danger:hover { background: var(--accent-light); border-color: var(--danger); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-icon { padding: 6px 8px; }
+    .btn-ghost { border: none; background: none; padding: 4px 6px; }
+    .btn-ghost:hover { background: var(--bg-hover); }
+
+    /* Inputs */
+    .input, .select { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font); font-size: 13px; color: var(--text); background: var(--bg-card); outline: none; transition: border-color 0.15s; }
+    .input:focus, .select:focus { border-color: var(--accent); }
+    .input { width: 100%; }
+
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px); }
+    .modal { background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); width: 560px; max-height: 85vh; overflow-y: auto; padding: 24px; }
+    .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+    .modal label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .modal .field { margin-bottom: 14px; }
+    .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light); }
+
+    /* Chips */
+    .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+    .chip-remove { cursor: pointer; opacity: 0.6; font-size: 14px; line-height: 1; }
+    .chip-remove:hover { opacity: 1; }
+
+    /* Checkbox group */
+    .check-group { display: flex; flex-wrap: wrap; gap: 6px; }
+    .check-item { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--radius); border: 1px solid var(--border); cursor: pointer; font-size: 12px; transition: all 0.15s; user-select: none; }
+    .check-item:hover { background: var(--bg-hover); }
+    .check-item.checked { border-color: var(--accent); background: var(--accent-light); }
+    .check-item input { display: none; }
+
+    /* Tooltip */
+    .tooltip { position: fixed; background: var(--text); color: var(--bg); padding: 8px 12px; border-radius: var(--radius); font-size: 12px; pointer-events: none; z-index: 200; box-shadow: var(--shadow-md); max-width: 280px; line-height: 1.6; white-space: pre-line; }
+
+    /* Empty state */
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; color: var(--text-muted); gap: 12px; }
+    .empty-state svg { opacity: 0.3; }
+
+    /* Dimensions */
+    .dim-section { margin-bottom: 12px; padding: 10px; border-radius: var(--radius); border: 1px solid var(--border-light); }
+    .dim-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .dim-header-name { font-size: 12px; font-weight: 600; flex: 1; }
+    .dim-header-name input { font-size: 12px; font-weight: 600; border: none; background: transparent; color: var(--text); outline: none; width: 100%; padding: 0; font-family: var(--font); }
+    .dim-header-name input:focus { border-bottom: 1px solid var(--accent); }
+    .dim-list { display: flex; flex-wrap: wrap; gap: 4px; }
+    .dim-add { display: flex; gap: 4px; margin-top: 6px; }
+    .dim-add .input { flex: 1; padding: 4px 8px; font-size: 11px; }
+
+    /* Activity list */
+    .act-item { padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--border-light); margin-bottom: 4px; cursor: pointer; transition: all 0.15s; font-size: 13px; }
+    .act-item:hover { background: var(--bg-hover); border-color: var(--border); }
+    .act-item .act-name { font-weight: 500; }
+    .act-item .act-dates { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+
+    /* Milestones */
+    .ms-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--border-light); margin-bottom: 4px; font-size: 12px; transition: all 0.15s; }
+    .ms-item:hover { background: var(--bg-hover); }
+    .ms-item .ms-line { width: 3px; height: 20px; background: #e03131; border-radius: 2px; flex-shrink: 0; }
+    .ms-item .ms-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+    .ms-item .ms-del { cursor: pointer; opacity: 0.4; margin-left: auto; font-size: 14px; }
+    .ms-item .ms-del:hover { opacity: 1; color: var(--danger); }
+
+    /* Dropdown */
+    .dropdown-wrap { position: relative; }
+    .dropdown-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); min-width: 200px; z-index: 50; padding: 4px 0; animation: dropIn 0.12s ease; }
+    @keyframes dropIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .dropdown-item { display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--text); transition: background 0.1s; white-space: nowrap; }
+    .dropdown-item:hover { background: var(--bg-hover); }
+    .dropdown-item .dd-icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; opacity: 0.6; }
+    .dropdown-item .dd-hint { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+    .dropdown-sep { height: 1px; background: var(--border-light); margin: 4px 0; }
+
+    /* Collapsible sections */
+    .collapsible-header { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; padding: 2px 0; margin-bottom: 8px; }
+    .collapsible-header:hover { opacity: 0.8; }
+    .collapsible-chevron { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; display: inline-block; width: 14px; text-align: center; flex-shrink: 0; }
+    .collapsible-chevron.open { transform: rotate(90deg); }
+    .collapsible-body { overflow: hidden; transition: max-height 0.25s ease, opacity 0.2s ease; }
+    .collapsible-body.collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; }
+    .collapsible-body.expanded { opacity: 1; }
+    .section-title { font-size: 13px; font-weight: 600; }
+    .section-sep { border-top: 1px solid var(--border-light); padding-top: 14px; margin-top: 14px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ── Colors ──────────────────────────────────────────────────────────────────
+const COLOR_POOL = [
+  '#3b5bdb','#2b8a3e','#e8590c','#c2255c','#6741d9','#0c8599','#d9480f','#5c940d',
+  '#862e9c','#1971c2','#e03131','#0b7285','#4263eb','#f76707','#37b24d','#7950f2',
+  '#1c7ed6','#f59f00','#fa5252','#40c057','#be4bdb','#1864ab','#c92a2a','#5f3dc4',
+  '#e67700','#f08c00','#495057','#364fc7',
+];
+function getColor(dimIdx, itemIdx) { return COLOR_POOL[((dimIdx * 5) % COLOR_POOL.length + itemIdx) % COLOR_POOL.length]; }
+
+const EXPORT_COLORS = {
+  bg:'#fff', laneEven:'#fafbfc', laneOdd:'#fff', grid:'#f1f3f5', gridMonth:'#dee2e6',
+  headerText:'#5f6470', dayText:'#868e96', dayWe:'#adb5bd', dayName:'#adb5bd', dayNameWe:'#c5cad3',
+  labelText:'#1a1d23', labelSep:'#e9ecef', laneSep:'#f1f3f5', weBg:'rgba(0,0,0,0.025)',
+};
+function getThemeColors() {
+  const s = getComputedStyle(document.documentElement);
+  const g = v => s.getPropertyValue(v).trim();
+  return { bg:g('--svg-bg'), laneEven:g('--svg-lane-even'), laneOdd:g('--svg-lane-odd'), grid:g('--svg-grid'), gridMonth:g('--svg-grid-month'), headerText:g('--svg-header-text'), dayText:g('--svg-day-text'), dayWe:g('--svg-day-we'), dayName:g('--svg-day-name'), dayNameWe:g('--svg-day-name-we'), labelText:g('--svg-label-text'), labelSep:g('--svg-label-sep'), laneSep:g('--svg-lane-sep'), weBg:g('--svg-we-bg') };
+}
+
+// ── Utils ───────────────────────────────────────────────────────────────────
+const genId = () => Math.random().toString(36).substring(2, 10);
+const toDate = s => { const [y,m,d] = s.split('-').map(Number); return new Date(Date.UTC(y, m-1, d)); };
+const fmtDate = d => d.toISOString().split('T')[0];
+const daysBetween = (a, b) => Math.round((toDate(b) - toDate(a)) / 864e5);
+const addDays = (s, n) => { const d = toDate(s); d.setUTCDate(d.getUTCDate() + n); return fmtDate(d); };
+const todayStr = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; };
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+const MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const DAYS = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+function getISOWeek(s) {
+  const d = toDate(s);
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const y1 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil((((t - y1) / 864e5) + 1) / 7);
+}
+
+// ── Storage & Data ──────────────────────────────────────────────────────────
+const STORAGE_KEY = 'timeline-viz-data';
+const loadData = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; } };
+const saveData = d => localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+
+function createEmptyProject(name) {
+  return {
+    id: genId(), name, milestones: [], activities: [], created: new Date().toISOString(),
+    dimensions: [{ id: genId(), name: 'Personen', items: [] }, { id: genId(), name: 'Services', items: [] }, { id: genId(), name: 'Stages', items: [] }],
+  };
+}
+function getDefaultState() { const p = createEmptyProject('Mein erstes Projekt'); return { projects: [p], activeProjectId: p.id }; }
+
+// ── Migration (v1 hardcoded dims → v2 dynamic) ─────────────────────────────
+const V1_DIM = { person:'Personen', service:'Services', stage:'Stages', strand:'Stränge' };
+const V1_KEY = { person:'persons', service:'services', stage:'stages', strand:'strands' };
+
+function migrateData(data) {
+  if (!data?.projects) return data;
+  data.projects = data.projects.map(p => {
+    if (Array.isArray(p.dimensions)) { p.milestones = p.milestones || []; return p; }
+    const oldDims = p.dimensions || {}, newDims = [], idMap = {};
+    Object.keys(V1_DIM).forEach(k => {
+      const items = oldDims[k] || [];
+      if (items.length) { const id = genId(); idMap[k] = id; newDims.push({ id, name: V1_DIM[k], items: items.map(it => ({...it})) }); }
+    });
+    const activities = (p.activities || []).map(act => {
+      const assignments = {};
+      Object.keys(V1_KEY).forEach(k => { const refs = act[V1_KEY[k]] || []; if (refs.length && idMap[k]) assignments[idMap[k]] = [...refs]; });
+      const { persons, services, stages, strands, ...rest } = act;
+      return { ...rest, assignments };
+    });
+    return { ...p, dimensions: newDims, activities, milestones: p.milestones || [] };
+  });
+  return data;
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────
+function exportSVG(el) {
+  if (!el) return;
+  const c = el.cloneNode(true); c.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const url = URL.createObjectURL(new Blob([c.outerHTML], { type: 'image/svg+xml' }));
+  Object.assign(document.createElement('a'), { href: url, download: 'timeline.svg' }).click();
+  URL.revokeObjectURL(url);
+}
+
+function exportPNG(el, scale = 2) {
+  if (!el) return;
+  const c = el.cloneNode(true); c.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const w = el.viewBox.baseVal.width || el.getBoundingClientRect().width;
+  const h = el.viewBox.baseVal.height || el.getBoundingClientRect().height;
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(c)], { type: 'image/svg+xml;charset=utf-8' }));
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement('canvas'); cv.width = w * scale; cv.height = h * scale;
+    const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    cv.toBlob(b => Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: 'timeline.png' }).click());
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+}
+
+// ── UI Primitives ───────────────────────────────────────────────────────────
+function Tooltip({ data, pos }) {
+  if (!data) return null;
+  return (<div className="tooltip" style={{ left: pos.x + 12, top: pos.y - 8 }}>
+    <div style={{ fontWeight: 600, marginBottom: 2 }}>{data.name}</div>
+    <div style={{ opacity: 0.8 }}>{data.startDate} → {data.endDate}</div>
+    {data.details && <div style={{ marginTop: 4, opacity: 0.7 }}>{data.details}</div>}
+  </div>);
+}
+
+function Modal({ children, onClose }) {
+  return (<div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal">{children}</div>
+  </div>);
+}
+
+function CollapsibleSection({ title, count, defaultOpen, storageKey, children, actions }) {
+  const [open, setOpen] = useState(() => {
+    if (storageKey) { try { const v = localStorage.getItem('tl-collapse-' + storageKey); if (v !== null) return v === '1'; } catch {} }
+    return defaultOpen !== false;
+  });
+  const bodyRef = useRef(null);
+  const [maxH, setMaxH] = useState('none');
+  useEffect(() => { if (bodyRef.current && open) setMaxH(bodyRef.current.scrollHeight + 500 + 'px'); }, [open, children]);
+  const toggle = () => { const next = !open; setOpen(next); if (storageKey) try { localStorage.setItem('tl-collapse-' + storageKey, next ? '1' : '0'); } catch {} };
+  return (<div>
+    <div className="collapsible-header" onClick={toggle}>
+      <span className={`collapsible-chevron ${open ? 'open' : ''}`}>▶</span>
+      <span className="section-title">{title}{count != null ? ` (${count})` : ''}</span>
+      {actions && <div style={{ marginLeft: 'auto' }} onClick={e => e.stopPropagation()}>{actions}</div>}
+    </div>
+    <div ref={bodyRef} className={`collapsible-body ${open ? 'expanded' : 'collapsed'}`} style={{ maxHeight: open ? maxH : 0 }}>{children}</div>
+  </div>);
+}
+
+function ExportDropdown({ onSVG, onPNG, onJSONCurrent, onJSONAll, onImport }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => { if (!open) return; const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, [open]);
+  const act = fn => { fn(); setOpen(false); };
+  return (<div className="dropdown-wrap" ref={ref}>
+    <button className="btn btn-sm" onClick={() => setOpen(!open)}>Export ▾</button>
+    {open && <div className="dropdown-menu">
+      <div className="dropdown-item" onClick={() => act(onSVG)}><span className="dd-icon">⤓</span>SVG<span className="dd-hint">aktuelle Ansicht</span></div>
+      <div className="dropdown-item" onClick={() => act(onPNG)}><span className="dd-icon">⤓</span>PNG<span className="dd-hint">aktuelle Ansicht</span></div>
+      <div className="dropdown-sep"></div>
+      <div className="dropdown-item" onClick={() => act(onJSONCurrent)}><span className="dd-icon">{ }</span>JSON<span className="dd-hint">aktuelles Projekt</span></div>
+      <div className="dropdown-item" onClick={() => act(onJSONAll)}><span className="dd-icon">{ }</span>JSON<span className="dd-hint">alle Projekte</span></div>
+      <div className="dropdown-sep"></div>
+      <div className="dropdown-item" onClick={() => act(onImport)}><span className="dd-icon">⤒</span>JSON importieren</div>
+    </div>}
+  </div>);
+}
+
+// ── Forms ───────────────────────────────────────────────────────────────────
+function ActivityForm({ activity, project, onSave, onDelete, onClone, onClose }) {
+  const isEdit = !!activity;
+  const [name, setName] = useState(activity?.name || '');
+  const [startDate, _setStart] = useState(activity?.startDate || todayStr());
+  const [endDate, _setEnd] = useState(activity?.endDate || addDays(todayStr(), 4));
+  const setStartDate = sd => { _setStart(sd); if (sd > endDate) _setEnd(sd); };
+  const setEndDate = ed => { if (ed >= startDate) _setEnd(ed); };
+  const [assignments, setAssignments] = useState(activity?.assignments || {});
+  const toggle = (dimId, itemId) => { const c = assignments[dimId] || []; setAssignments({ ...assignments, [dimId]: c.includes(itemId) ? c.filter(x => x !== itemId) : [...c, itemId] }); };
+  const save = () => { if (!name.trim()) return; onSave({ id: activity?.id || genId(), name: name.trim(), startDate, endDate, assignments }); onClose(); };
+
+  return (<Modal onClose={onClose}>
+    <h3>{isEdit ? 'Aktivität bearbeiten' : 'Neue Aktivität'}</h3>
+    <div className="field"><label>Name</label>
+      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="z.B. Service A Migration" autoFocus onKeyDown={e => { if (e.key === 'Enter') save(); }} /></div>
+    <div style={{ display: 'flex', gap: 12 }}>
+      <div className="field" style={{ flex: 1 }}><label>Start</label><input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
+      <div className="field" style={{ flex: 1 }}><label>Ende</label><input className="input" type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} /></div>
+    </div>
+    {project.dimensions.map((dim, di) => dim.items.length > 0 && <div className="field" key={dim.id}><label>{dim.name}</label><div className="check-group">
+      {dim.items.map((item, idx) => { const sel = (assignments[dim.id] || []).includes(item.id); const col = getColor(di, idx);
+        return (<label key={item.id} className={`check-item ${sel ? 'checked' : ''}`} style={sel ? { borderColor: col, background: col + '15' } : {}}>
+          <input type="checkbox" checked={sel} onChange={() => toggle(dim.id, item.id)} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0 }}></span>{item.name}</label>);
+      })}</div></div>)}
+    <div className="actions">
+      {isEdit && <button className="btn btn-danger" onClick={() => { onDelete(activity.id); onClose(); }}>Löschen</button>}
+      {isEdit && <button className="btn" onClick={() => onClone({ id: genId(), name: name.trim() + ' (Kopie)', startDate, endDate, assignments: JSON.parse(JSON.stringify(assignments)) })}>Klonen</button>}
+      <div style={{ flex: 1 }}></div>
+      <button className="btn" onClick={onClose}>Abbrechen</button>
+      <button className="btn btn-primary" onClick={save}>{isEdit ? 'Speichern' : 'Anlegen'}</button>
+    </div>
+  </Modal>);
+}
+
+function ProjectForm({ project, onSave, onClose }) {
+  const [name, setName] = useState(project?.name || '');
+  return (<Modal onClose={onClose}>
+    <h3>{project ? 'Projekt umbenennen' : 'Neues Projekt'}</h3>
+    <div className="field"><label>Projektname</label>
+      <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="z.B. RZ-Umzug Q2" autoFocus onKeyDown={e => { if (e.key === 'Enter' && name.trim()) { onSave(name.trim()); onClose(); } }} /></div>
+    <div className="actions">
+      <button className="btn" onClick={onClose}>Abbrechen</button>
+      <button className="btn btn-primary" onClick={() => { if (name.trim()) { onSave(name.trim()); onClose(); } }}>{project ? 'Speichern' : 'Anlegen'}</button>
+    </div>
+  </Modal>);
+}
+
+// ── Sidebar Managers ────────────────────────────────────────────────────────
+function DimensionManager({ project, onChange }) {
+  const [newItemNames, setNewItemNames] = useState({});
+  const [editingDimName, setEditingDimName] = useState(null);
+
+  const addDim = () => onChange({ ...project, dimensions: [...project.dimensions, { id: genId(), name: 'Neue Dimension', items: [] }] });
+  const renameDim = (id, name) => onChange({ ...project, dimensions: project.dimensions.map(d => d.id === id ? { ...d, name } : d) });
+  const removeDim = id => {
+    const activities = project.activities.map(a => { const asgn = { ...a.assignments }; delete asgn[id]; return { ...a, assignments: asgn }; });
+    onChange({ ...project, dimensions: project.dimensions.filter(d => d.id !== id), activities });
+  };
+  const addItem = dimId => {
+    const name = (newItemNames[dimId] || '').trim(); if (!name) return;
+    onChange({ ...project, dimensions: project.dimensions.map(d => d.id === dimId ? { ...d, items: [...d.items, { id: genId(), name }] } : d) });
+    setNewItemNames({ ...newItemNames, [dimId]: '' });
+  };
+  const removeItem = (dimId, itemId) => {
+    const dims = project.dimensions.map(d => d.id === dimId ? { ...d, items: d.items.filter(it => it.id !== itemId) } : d);
+    const activities = project.activities.map(a => { const r = a.assignments[dimId] || []; return r.includes(itemId) ? { ...a, assignments: { ...a.assignments, [dimId]: r.filter(x => x !== itemId) } } : a; });
+    onChange({ ...project, dimensions: dims, activities });
+  };
+
+  return (<div>
+    {project.dimensions.map((dim, di) => <div key={dim.id} className="dim-section">
+      <div className="dim-header">
+        {editingDimName === dim.id
+          ? <div className="dim-header-name"><input defaultValue={dim.name} autoFocus
+              onBlur={e => { renameDim(dim.id, e.target.value || dim.name); setEditingDimName(null); }}
+              onKeyDown={e => { if (e.key === 'Enter') { renameDim(dim.id, e.target.value || dim.name); setEditingDimName(null); } if (e.key === 'Escape') setEditingDimName(null); }} /></div>
+          : <span className="dim-header-name" onClick={() => setEditingDimName(dim.id)} style={{ cursor: 'pointer' }} title="Klick zum Umbenennen">{dim.name} <span style={{ fontSize: 10, opacity: 0.4 }}>✎</span></span>}
+        <button className="btn-ghost btn-sm" style={{ color: 'var(--text-muted)', fontSize: 14 }} onClick={() => { if (confirm(`Dimension "${dim.name}" löschen?`)) removeDim(dim.id); }} title="Dimension löschen">×</button>
+      </div>
+      <div className="dim-list">
+        {dim.items.map((item, idx) => <span key={item.id} className="chip" style={{ background: getColor(di, idx) + '20', color: getColor(di, idx) }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: getColor(di, idx) }}></span>{item.name}<span className="chip-remove" onClick={() => removeItem(dim.id, item.id)}>×</span></span>)}
+        {dim.items.length === 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Keine Einträge</span>}
+      </div>
+      <div className="dim-add">
+        <input className="input" value={newItemNames[dim.id] || ''} onChange={e => setNewItemNames({ ...newItemNames, [dim.id]: e.target.value })} placeholder="Neuer Eintrag…" onKeyDown={e => { if (e.key === 'Enter') addItem(dim.id); }} />
+        <button className="btn btn-sm btn-primary" onClick={() => addItem(dim.id)}>+</button>
+      </div>
+    </div>)}
+    <button className="btn btn-sm" onClick={addDim} style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}>+ Dimension hinzufügen</button>
+  </div>);
+}
+
+function MilestoneManager({ milestones, onChange }) {
+  const [label, setLabel] = useState('');
+  const [date, setDate] = useState(todayStr());
+  const add = () => { if (!label.trim()) return; onChange([...milestones, { id: genId(), label: label.trim(), date }]); setLabel(''); };
+  return (<div>
+    {milestones.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Noch keine Meilensteine</div>}
+    {[...milestones].sort((a, b) => a.date.localeCompare(b.date)).map(ms => <div key={ms.id} className="ms-item">
+      <div className="ms-line"></div><div><div style={{ fontWeight: 500 }}>{ms.label}</div><div className="ms-date">{ms.date}</div></div>
+      <span className="ms-del" onClick={() => onChange(milestones.filter(m => m.id !== ms.id))}>×</span></div>)}
+    <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+      <input className="input" style={{ flex: 1, padding: '5px 10px', fontSize: 12 }} value={label} onChange={e => setLabel(e.target.value)} placeholder="Meilenstein-Name…" onKeyDown={e => { if (e.key === 'Enter') add(); }} /></div>
+    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+      <input className="input" type="date" style={{ flex: 1, padding: '5px 10px', fontSize: 12 }} value={date} onChange={e => setDate(e.target.value)} />
+      <button className="btn btn-sm btn-primary" onClick={add}>+</button></div>
+  </div>);
+}
+
+// ── Timeline SVG ────────────────────────────────────────────────────────────
+function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate, totalDays, svgRef, forExport }) {
+  const [tooltip, setTooltip] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const c = forExport ? EXPORT_COLORS : getThemeColors();
+
+  const groupDim = project.dimensions.find(d => d.id === groupByDimId);
+  const colorDim = project.dimensions.find(d => d.id === colorByDimId);
+  const colorDimIdx = project.dimensions.findIndex(d => d.id === colorByDimId);
+
+  const lanes = (groupDim ? groupDim.items : []).map(item => ({
+    item, activities: project.activities.filter(a => (a.assignments[groupByDimId] || []).includes(item.id)),
+  }));
+  const unassigned = project.activities.filter(a => !(a.assignments[groupByDimId] || []).length);
+  if (unassigned.length) lanes.push({ item: { id: '_none', name: '(nicht zugeordnet)' }, activities: unassigned });
+
+  const kwH = 14, hdrH = 48 + kwH, monthH = 20, msFooterH = (project.milestones || []).length ? 28 : 0;
+  const lblW = 160, svgW = lblW + totalDays * dayWidth;
+
+  const days = Array.from({ length: totalDays }, (_, i) => {
+    const ds = addDays(startDate, i), d = toDate(ds);
+    return { ds, day: d.getUTCDate(), dow: d.getUTCDay(), month: d.getUTCMonth(), year: d.getUTCFullYear() };
+  });
+
+  const months = []; let cm = -1;
+  days.forEach((d, i) => { if (d.month !== cm) { cm = d.month; months.push({ month: d.month, year: d.year, si: i }); } });
+
+  const today = todayStr(), todayIdx = daysBetween(startDate, today);
+
+  function stack(acts) {
+    const sorted = [...acts].sort((a, b) => toDate(a.startDate) - toDate(b.startDate));
+    const rows = [];
+    sorted.forEach(act => {
+      for (const r of rows) { if (toDate(act.startDate) >= toDate(r[r.length - 1].endDate)) { r.push(act); return; } }
+      rows.push([act]);
+    });
+    return rows;
+  }
+
+  function barColor(act) {
+    if (!colorDim) return '#868e96';
+    const refs = act.assignments[colorByDimId] || []; if (!refs.length) return '#868e96';
+    const idx = colorDim.items.findIndex(c => c.id === refs[0]);
+    return idx >= 0 ? getColor(colorDimIdx, idx) : '#868e96';
+  }
+
+  function details(act) {
+    const parts = [];
+    project.dimensions.forEach(dim => { const refs = act.assignments[dim.id] || []; if (refs.length) parts.push(`${dim.name}: ${refs.map(id => dim.items.find(x => x.id === id)?.name || '?').join(', ')}`); });
+    const dur = daysBetween(act.startDate, act.endDate) + 1;
+    parts.push(`Dauer: ${dur} Tag${dur !== 1 ? 'e' : ''}`);
+    return parts.join('\n');
+  }
+
+  const onMM = useCallback(e => setTooltipPos({ x: e.clientX, y: e.clientY }), []);
+  const barH = 26, gap = 2, laneBase = 52;
+  const laneHeights = lanes.map(l => Math.max(laneBase, Math.max(1, stack(l.activities).length) * (barH + gap) + 12));
+  const lanesH = laneHeights.reduce((s, h) => s + h, 0);
+  const totalH = monthH + hdrH + lanesH + msFooterH;
+
+  // Sticky label overlay (display mode only)
+  const labelOverlay = (<div style={{ position: 'sticky', left: 0, width: lblW + 1, height: totalH, zIndex: 5, pointerEvents: 'none' }}>
+    <svg width={lblW + 1} height={totalH} viewBox={`0 0 ${lblW + 1} ${totalH}`} style={{ display: 'block', fontFamily: "'DM Sans', sans-serif" }}>
+      <rect width={lblW + 1} height={monthH + hdrH} fill={c.bg} />
+      {(() => { let y = monthH + hdrH; return lanes.map((l, i) => { const h = laneHeights[i]; const cy = y; y += h;
+        return (<g key={'lbl-' + l.item.id}><rect x={0} y={cy} width={lblW + 1} height={h} fill={i % 2 === 0 ? c.laneEven : c.laneOdd} />
+          <line x1={0} y1={cy + h} x2={lblW + 1} y2={cy + h} stroke={c.laneSep} strokeWidth={1} />
+          <text x={12} y={cy + h / 2 + 4} fontSize="12" fontWeight="500" fill={c.labelText}>{l.item.name}</text></g>);
+      }); })()}
+      {msFooterH > 0 && <rect y={monthH + hdrH + lanesH} width={lblW + 1} height={msFooterH} fill={c.bg} />}
+      <line x1={lblW} y1={0} x2={lblW} y2={totalH} stroke={c.labelSep} strokeWidth={1} />
+    </svg>
+  </div>);
+
+  return (<div style={{ position: 'relative', ...(!forExport ? { width: svgW, minHeight: totalH } : {}) }} onMouseMove={onMM}>
+    {!forExport && labelOverlay}
+    <svg ref={svgRef} width={svgW} height={totalH} viewBox={`0 0 ${svgW} ${totalH}`}
+         style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", ...(!forExport ? { position: 'absolute', top: 0, left: 0 } : {}) }}>
+      <rect width={svgW} height={totalH} fill={c.bg} />
+
+      {/* Month headers */}
+      {months.map((m, i) => { const ns = i < months.length - 1 ? months[i + 1].si : totalDays; const w = (ns - m.si) * dayWidth;
+        return <text key={`m${i}`} x={lblW + m.si * dayWidth + w / 2} y={14} textAnchor="middle" fontSize="11" fontWeight="600" fill={c.headerText}>{MONTHS[m.month]} {m.year}</text>; })}
+
+      {/* KW row */}
+      {(() => { const blocks = []; let ks = 0, lk = -1;
+        days.forEach((d, i) => { const kw = getISOWeek(d.ds); if (kw !== lk) { if (lk !== -1) blocks.push({ kw: lk, s: ks, e: i }); ks = i; lk = kw; } });
+        if (lk !== -1) blocks.push({ kw: lk, s: ks, e: days.length });
+        return blocks.map((b, i) => { const x = lblW + b.s * dayWidth, w = (b.e - b.s) * dayWidth;
+          return (<g key={`kw${i}`}>{i > 0 && <line x1={x} y1={monthH} x2={x} y2={monthH + kwH} stroke={c.grid} strokeWidth={0.5} />}
+            {w > 30 && <text x={x + w / 2} y={monthH + 11} textAnchor="middle" fontSize="9" fontWeight="500" fill={c.dayName}>KW{b.kw}</text>}</g>); }); })()}
+      <line x1={lblW} y1={monthH + kwH} x2={svgW} y2={monthH + kwH} stroke={c.grid} strokeWidth={0.5} />
+
+      {/* Day columns */}
+      {days.map((d, i) => { const x = lblW + i * dayWidth, isT = d.ds === today, isW = d.dow === 0 || d.dow === 6;
+        return (<g key={`d${i}`}>
+          {isW && <rect x={x} y={monthH + kwH} width={dayWidth} height={totalH - monthH - kwH} fill={c.weBg} />}
+          {dayWidth >= 18 && <text x={x + dayWidth / 2} y={monthH + kwH + 16} textAnchor="middle" fontSize={dayWidth >= 28 ? "11" : "9"} fontWeight={isT ? "700" : "400"} fill={isT ? '#e03131' : isW ? c.dayWe : c.dayText}>{d.day}</text>}
+          {dayWidth >= 28 && <text x={x + dayWidth / 2} y={monthH + kwH + 30} textAnchor="middle" fontSize="9" fill={isT ? '#e03131' : isW ? c.dayNameWe : c.dayName}>{DAYS[d.dow]}</text>}
+          <line x1={x} y1={monthH + hdrH - 4} x2={x} y2={totalH} stroke={d.day === 1 ? c.gridMonth : c.grid} strokeWidth={d.day === 1 ? 1 : 0.5} />
+        </g>); })}
+      <line x1={0} y1={monthH + hdrH - 4} x2={svgW} y2={monthH + hdrH - 4} stroke={c.gridMonth} strokeWidth={1} />
+
+      {/* Lanes + bars */}
+      {(() => { let y = monthH + hdrH; return lanes.map((lane, li) => { const h = laneHeights[li]; const ly = y; y += h;
+        return (<g key={lane.item.id}>
+          <rect x={0} y={ly} width={svgW} height={h} fill={li % 2 === 0 ? c.laneEven : c.laneOdd} />
+          <line x1={0} y1={ly + h} x2={svgW} y2={ly + h} stroke={c.laneSep} strokeWidth={1} />
+          <text x={12} y={ly + h / 2 + 4} fontSize="12" fontWeight="500" fill={c.labelText}>{lane.item.name}</text>
+          <line x1={lblW - 1} y1={ly} x2={lblW - 1} y2={ly + h} stroke={c.labelSep} strokeWidth={1} />
+          {stack(lane.activities).map((row, ri) => row.map(act => {
+            const s = daysBetween(startDate, act.startDate), dur = daysBetween(act.startDate, act.endDate) + 1;
+            const bx = lblW + s * dayWidth + 1, bw = Math.max(dur * dayWidth - 2, 4), by = ly + 6 + ri * (barH + gap), col = barColor(act);
+            return (<g key={act.id} onMouseEnter={() => !forExport && setTooltip({ name: act.name, startDate: act.startDate, endDate: act.endDate, details: details(act) })} onMouseLeave={() => !forExport && setTooltip(null)} style={{ cursor: forExport ? 'default' : 'pointer' }}>
+              <rect x={bx} y={by} width={bw} height={barH} rx={4} fill={col} opacity={0.88} />
+              {bw > 40 && <text x={bx + 6} y={by + barH / 2 + 4} fontSize="11" fontWeight="500" fill="#fff">{act.name.length > Math.floor(bw / 7) ? act.name.slice(0, Math.floor(bw / 7) - 1) + '…' : act.name}</text>}
+            </g>); }))}
+        </g>); }); })()}
+
+      {/* Milestones */}
+      {(project.milestones || []).map(ms => { const mi = daysBetween(startDate, ms.date); if (mi < 0 || mi >= totalDays) return null;
+        const mx = lblW + mi * dayWidth + dayWidth / 2, top = monthH + hdrH - 4, bot = monthH + hdrH + lanesH;
+        return (<g key={ms.id}><line x1={mx} y1={top} x2={mx} y2={bot + 2} stroke="#e03131" strokeWidth={1.5} opacity={0.7} />
+          <circle cx={mx} cy={top} r={3} fill="#e03131" opacity={0.8} />
+          {msFooterH > 0 && <text x={mx} y={bot + 16} textAnchor="middle" fontSize="9" fontWeight="600" fill="#e03131" opacity={0.85}>{ms.label.length > Math.floor(dayWidth * 2 / 6) ? ms.label.slice(0, Math.floor(dayWidth * 2 / 6) - 1) + '…' : ms.label}</text>}
+        </g>); })}
+
+      {/* Today */}
+      {todayIdx >= 0 && todayIdx < totalDays && <line x1={lblW + todayIdx * dayWidth + dayWidth / 2} y1={monthH + hdrH - 4} x2={lblW + todayIdx * dayWidth + dayWidth / 2} y2={monthH + hdrH + lanesH} stroke="#e03131" strokeWidth={2} strokeDasharray="4 3" opacity={0.45} />}
+    </svg>
+    {!forExport && tooltip && <Tooltip data={tooltip} pos={tooltipPos} />}
+  </div>);
+}
+
+function Legend({ project, colorByDimId }) {
+  const dim = project.dimensions.find(d => d.id === colorByDimId);
+  const di = project.dimensions.indexOf(dim);
+  if (!dim || !dim.items.length) return null;
+  return (<div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '6px 0' }}>
+    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, alignSelf: 'center' }}>Farbe = {dim.name}:</span>
+    {dim.items.map((item, idx) => <span key={item.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+      <span style={{ width: 10, height: 10, borderRadius: 3, background: getColor(di, idx), flexShrink: 0 }}></span>{item.name}</span>)}
+  </div>);
+}
+
+// ── App ─────────────────────────────────────────────────────────────────────
+function App() {
+  const initial = migrateData(loadData()) || getDefaultState();
+  const [projects, setProjects] = useState(initial.projects);
+  const [activeProjectId, setActiveProjectId] = useState(initial.activeProjectId);
+  const [groupByDimId, setGroupByDimId] = useState('');
+  const [colorByDimId, setColorByDimId] = useState('');
+  const [dayWidth, setDayWidth] = useState(32);
+  const [showActForm, setShowActForm] = useState(false);
+  const [editingAct, setEditingAct] = useState(null);
+  const [showProjForm, setShowProjForm] = useState(false);
+  const [editingProj, setEditingProj] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [importData, setImportData] = useState(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  const historyRef = useRef({ past: [], future: [] });
+  const skipHistoryRef = useRef(false);
+  const prevRef = useRef(null);
+  const prevIdRef = useRef(null);
+  const exportSvgRef = useRef(null);
+  const timelineRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const project = projects.find(p => p.id === activeProjectId) || projects[0];
+  const dims = project?.dimensions || [];
+
+  // Undo / Redo
+  const doUndo = useCallback(() => {
+    const h = historyRef.current; if (!h.past.length) return;
+    h.future.push({ projects: JSON.parse(JSON.stringify(projects)), activeProjectId });
+    const prev = h.past.pop(); skipHistoryRef.current = true;
+    setProjects(prev.projects); setActiveProjectId(prev.activeProjectId);
+    setCanUndo(h.past.length > 0); setCanRedo(true);
+  }, [projects, activeProjectId]);
+
+  const doRedo = useCallback(() => {
+    const h = historyRef.current; if (!h.future.length) return;
+    h.past.push({ projects: JSON.parse(JSON.stringify(projects)), activeProjectId });
+    const next = h.future.pop(); skipHistoryRef.current = true;
+    setProjects(next.projects); setActiveProjectId(next.activeProjectId);
+    setCanUndo(true); setCanRedo(h.future.length > 0);
+  }, [projects, activeProjectId]);
+
+  useEffect(() => {
+    const h = e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); doUndo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); doRedo(); }
+    };
+    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
+  }, [doUndo, doRedo]);
+
+  // Auto-select dims
+  useEffect(() => {
+    if (!dims.length) { setGroupByDimId(''); setColorByDimId(''); return; }
+    if (!dims.find(d => d.id === groupByDimId)) setGroupByDimId(dims[0].id);
+    if (!dims.find(d => d.id === colorByDimId) || colorByDimId === groupByDimId) { const o = dims.find(d => d.id !== groupByDimId); setColorByDimId(o ? o.id : dims[0].id); }
+  }, [dims, groupByDimId, colorByDimId]);
+
+  // Persist + history tracking
+  useEffect(() => {
+    if (skipHistoryRef.current) { skipHistoryRef.current = false; }
+    else if (prevRef.current !== null) {
+      const h = historyRef.current;
+      h.past.push({ projects: JSON.parse(JSON.stringify(prevRef.current)), activeProjectId: prevIdRef.current });
+      if (h.past.length > 50) h.past.shift(); h.future = [];
+      setCanUndo(true); setCanRedo(false);
+    }
+    prevRef.current = JSON.parse(JSON.stringify(projects)); prevIdRef.current = activeProjectId;
+    saveData({ projects, activeProjectId });
+  }, [projects]);
+
+  // Date range
+  const { startDate, totalDays } = useMemo(() => {
+    const dates = [];
+    if (project) { project.activities.forEach(a => dates.push(a.startDate, a.endDate)); (project.milestones || []).forEach(m => dates.push(m.date)); }
+    if (!dates.length) { const t = todayStr(); return { startDate: addDays(t, -7), totalDays: 42 }; }
+    let mn = dates[0], mx = dates[0]; dates.forEach(d => { if (d < mn) mn = d; if (d > mx) mx = d; });
+    const pad = addDays(mn, -3); return { startDate: pad, totalDays: Math.max(daysBetween(pad, addDays(mx, 5)), 14) };
+  }, [project]);
+
+  // CRUD
+  const updateProject = u => setProjects(projects.map(p => p.id === u.id ? u : p));
+  const addProject = name => { const p = createEmptyProject(name); setProjects([...projects, p]); setActiveProjectId(p.id); };
+  const deleteProject = id => { if (projects.length <= 1) return; const r = projects.filter(p => p.id !== id); setProjects(r); if (activeProjectId === id) setActiveProjectId(r[0].id); };
+  const saveActivity = act => { const exists = project.activities.find(a => a.id === act.id); updateProject({ ...project, activities: exists ? project.activities.map(a => a.id === act.id ? act : a) : [...project.activities, act] }); setEditingAct(null); };
+  const deleteActivity = id => updateProject({ ...project, activities: project.activities.filter(a => a.id !== id) });
+
+  // Import / Export
+  const expJSONAll = () => { const b = new Blob([JSON.stringify({ projects, activeProjectId }, null, 2)], { type: 'application/json' }); Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: 'timeline-all.json' }).click(); };
+  const expJSONCurrent = () => { const d = { projects: [project], activeProjectId: project.id }; const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: `timeline-${project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json` }).click(); };
+  const impJSON = e => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = migrateData(JSON.parse(ev.target.result)); if (!d?.projects?.length) { alert('Keine Projekte gefunden.'); return; } setImportData({ data: d, fileName: f.name }); } catch (err) { alert('Import fehlgeschlagen: ' + err.message); } }; r.readAsText(f); e.target.value = ''; };
+  const impReplace = () => { if (!importData) return; setProjects(importData.data.projects); setActiveProjectId(importData.data.activeProjectId || importData.data.projects[0]?.id); setImportData(null); };
+  const impMerge = () => { if (!importData) return; const m = [...projects]; importData.data.projects.forEach(ip => { const i = m.findIndex(p => p.id === ip.id); if (i >= 0) m[i] = ip; else m.push(ip); }); setProjects(m); setActiveProjectId(importData.data.projects[0]?.id || activeProjectId); setImportData(null); };
+
+  const zoomIn = () => setDayWidth(w => Math.min(w + 8, 80));
+  const zoomOut = () => setDayWidth(w => Math.max(w - 8, 8));
+  const zoomFit = () => { if (timelineRef.current && totalDays) { setDayWidth(clamp(Math.floor((timelineRef.current.clientWidth - 160) / totalDays), 8, 80)); } };
+  const scrollToday = () => { if (!timelineRef.current) return; timelineRef.current.scrollLeft = Math.max(0, daysBetween(startDate, todayStr()) * dayWidth - timelineRef.current.clientWidth / 2); };
+  const doExportSVG = () => setTimeout(() => exportSVG(exportSvgRef.current), 50);
+  const doExportPNG = () => setTimeout(() => exportPNG(exportSvgRef.current), 50);
+
+  const hasData = project && (project.activities.length > 0 || (project.milestones || []).length > 0);
+
+  return (<div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    {/* Toolbar */}
+    <div style={{ height: 50, background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5"><path d="M3 6h18M3 12h13M3 18h8"/></svg>
+        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--accent)' }}>Timeline</span>
+      </div>
+      <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }}></div>
+      <select className="select" value={activeProjectId} onChange={e => setActiveProjectId(e.target.value)} style={{ maxWidth: 200 }}>
+        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+      <button className="btn btn-sm" onClick={() => { setEditingProj(false); setShowProjForm(true); }} title="Neues Projekt">＋</button>
+      <button className="btn btn-sm" onClick={() => { setEditingProj(true); setShowProjForm(true); }} title="Umbenennen">✎</button>
+      {projects.length > 1 && <button className="btn btn-sm btn-danger" onClick={() => { if (confirm(`"${project.name}" löschen?`)) deleteProject(project.id); }}>✕</button>}
+      <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }}></div>
+      {dims.length > 0 && <>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Lanes:</span>
+        <select className="select" value={groupByDimId} onChange={e => { setGroupByDimId(e.target.value); if (e.target.value === colorByDimId) { const o = dims.find(d => d.id !== e.target.value); if (o) setColorByDimId(o.id); } }} style={{ width: 130 }}>
+          {dims.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+        {dims.length > 1 && <>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Farbe:</span>
+          <select className="select" value={colorByDimId} onChange={e => setColorByDimId(e.target.value)} style={{ width: 130 }}>
+            {dims.filter(d => d.id !== groupByDimId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+        </>}
+      </>}
+      <div style={{ flex: 1 }}></div>
+      <button className="btn btn-sm btn-icon" onClick={doUndo} disabled={!canUndo} style={{ opacity: canUndo ? 1 : 0.3 }} title="Rückgängig (Ctrl+Z)">↩</button>
+      <button className="btn btn-sm btn-icon" onClick={doRedo} disabled={!canRedo} style={{ opacity: canRedo ? 1 : 0.3 }} title="Wiederholen (Ctrl+Shift+Z)">↪</button>
+      <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 2px' }}></div>
+      <button className="btn btn-sm btn-icon" onClick={zoomOut} title="Verkleinern">−</button>
+      <button className="btn btn-sm btn-icon" onClick={zoomFit} title="Einpassen">⊞</button>
+      <button className="btn btn-sm btn-icon" onClick={zoomIn} title="Vergrößern">+</button>
+      <button className="btn btn-sm" onClick={scrollToday}>Heute</button>
+      <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 2px' }}></div>
+      <ExportDropdown onSVG={doExportSVG} onPNG={doExportPNG} onJSONCurrent={expJSONCurrent} onJSONAll={expJSONAll} onImport={() => fileInputRef.current?.click()} />
+      <input ref={fileInputRef} type="file" accept=".json" onChange={impJSON} style={{ display: 'none' }} />
+    </div>
+
+    {/* Main */}
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* Sidebar */}
+      <div style={{ width: sidebarOpen ? 300 : 0, flexShrink: 0, transition: 'width 0.2s', borderRight: sidebarOpen ? '1px solid var(--border)' : 'none', background: 'var(--bg-card)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
+          <CollapsibleSection title="Dimensionen" count={dims.length} defaultOpen storageKey="dims">
+            <DimensionManager project={project} onChange={updateProject} />
+          </CollapsibleSection>
+          <div className="section-sep">
+            <CollapsibleSection title="Aktivitäten" count={project.activities.length} defaultOpen storageKey="acts"
+              actions={<button className="btn btn-sm btn-primary" onClick={() => { setEditingAct(null); setShowActForm(true); }}>+ Neu</button>}>
+              {!project.activities.length ? <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '4px 0' }}>Noch keine Aktivitäten.</div>
+                : [...project.activities].sort((a, b) => a.startDate.localeCompare(b.startDate)).map(act =>
+                  <div key={act.id} className="act-item" onClick={() => { setEditingAct(act); setShowActForm(true); }}>
+                    <div className="act-name">{act.name}</div><div className="act-dates">{act.startDate} → {act.endDate}</div></div>)}
+            </CollapsibleSection>
+          </div>
+          <div className="section-sep">
+            <CollapsibleSection title="Meilensteine" count={(project.milestones || []).length} defaultOpen storageKey="ms">
+              <MilestoneManager milestones={project.milestones || []} onChange={ms => updateProject({ ...project, milestones: ms })} />
+            </CollapsibleSection>
+          </div>
+        </div>
+      </div>
+
+      {/* Sidebar toggle */}
+      <div style={{ width: 20, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'var(--bg)', borderRight: '1px solid var(--border-light)' }}
+           onClick={() => setSidebarOpen(!sidebarOpen)} title={sidebarOpen ? 'Schließen' : 'Öffnen'}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', transform: sidebarOpen ? 'rotate(0)' : 'rotate(180deg)', transition: 'transform 0.2s', display: 'inline-block' }}>◂</span>
+      </div>
+
+      {/* Timeline */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-card)' }}>
+        {hasData && dims.length > 1 && <div style={{ padding: '4px 16px', borderBottom: '1px solid var(--border-light)', flexShrink: 0, background: 'var(--bg-card)', zIndex: 3 }}>
+          <Legend project={project} colorByDimId={colorByDimId} /></div>}
+        <div style={{ flex: 1, overflow: 'auto' }} ref={timelineRef}>
+          {!hasData || !dims.length
+            ? <div className="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>Noch keine Timeline-Daten</div><div style={{ fontSize: 13 }}>{!dims.length ? 'Lege links Dimensionen an.' : 'Erstelle Aktivitäten.'}</div></div>
+            : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} />}
+        </div>
+      </div>
+    </div>
+
+    {/* Hidden export SVG (always light) */}
+    {hasData && dims.length > 0 && <div style={{ position: 'absolute', left: -99999, top: -99999 }}>
+      <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={exportSvgRef} forExport={true} /></div>}
+
+    {/* Modals */}
+    {showActForm && <ActivityForm key={editingAct?.id || '_new'} activity={editingAct} project={project} onSave={saveActivity} onDelete={deleteActivity}
+      onClone={cloned => { saveActivity(cloned); setEditingAct(cloned); }} onClose={() => { setShowActForm(false); setEditingAct(null); }} />}
+    {showProjForm && <ProjectForm project={editingProj ? project : null} onSave={name => { if (editingProj) updateProject({ ...project, name }); else addProject(name); }} onClose={() => setShowProjForm(false)} />}
+    {importData && <Modal onClose={() => setImportData(null)}>
+      <h3>JSON importieren</h3>
+      <div style={{ fontSize: 13, marginBottom: 12 }}><span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>{importData.fileName}</span> enthält <strong>{importData.data.projects.length}</strong> Projekt{importData.data.projects.length !== 1 ? 'e' : ''}:</div>
+      <div style={{ marginBottom: 16 }}>{importData.data.projects.map(p =>
+        <div key={p.id} style={{ padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border-light)', marginBottom: 4, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 500 }}>{p.name}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.activities?.length || 0} Akt. · {p.dimensions?.length || 0} Dim.{projects.find(x => x.id === p.id) ? ' · ⚠ existiert' : ''}</span>
+        </div>)}</div>
+      <div className="actions" style={{ flexDirection: 'column', gap: 8 }}>
+        <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={impMerge}>Zu bestehenden hinzufügen</button>
+        <button className="btn btn-danger" style={{ width: '100%', justifyContent: 'center' }} onClick={impReplace}>Alle ersetzen</button>
+        <button className="btn" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setImportData(null)}>Abbrechen</button>
+      </div>
+    </Modal>}
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
