@@ -9,7 +9,7 @@ A pivot-based timeline visualization tool — plot activities across dynamic dim
 
 ## Live Demo
 
-**[https://runter-vom-mattenwagen.github.io/timeline-visualizer/](https://runter-vom-mattenwagen.github.io/timeline-visualizer/)**
+**[https://runter-vom-mattenwagen.github.io/timeline/](https://runter-vom-mattenwagen.github.io/timeline/)**
 
 ## What It Does
 
