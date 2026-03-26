@@ -162,6 +162,8 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
+const VERSION = '1.1.0';
+
 // ── Colors ──────────────────────────────────────────────────────────────────
 const COLOR_POOL = [
   '#3b5bdb','#2b8a3e','#e8590c','#c2255c','#6741d9','#0c8599','#d9480f','#5c940d',
@@ -694,7 +696,10 @@ function App() {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5"><path d="M3 6h18M3 12h13M3 18h8"/></svg>
         <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--accent)' }}>Timeline</span>
         <div className="logo-tip">
-          <a href="https://github.com/runter-vom-mattenwagen/timeline" target="_blank" rel="noopener">github.com/runter-vom-mattenwagen/timeline</a>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+            <a href="https://github.com/runter-vom-mattenwagen/timeline" target="_blank" rel="noopener">github.com/runter-vom-mattenwagen/timeline</a>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>v{VERSION}</span>
+          </div>
           <div className="logo-desc">A pivot-based timeline visualization tool — plot activities across dynamic dimensions and switch perspectives instantly. Not a project management tool, but a fast visual thinking aid for temporal planning.</div>
         </div>
       </div>
