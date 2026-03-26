@@ -162,7 +162,7 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 // ── Colors ──────────────────────────────────────────────────────────────────
 const COLOR_POOL = [
@@ -192,6 +192,7 @@ const daysBetween = (a, b) => Math.round((toDate(b) - toDate(a)) / 864e5);
 const addDays = (s, n) => { const d = toDate(s); d.setUTCDate(d.getUTCDate() + n); return fmtDate(d); };
 const todayStr = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const EMPTY_SET = new Set();
 
 const MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const DAYS = ['So','Mo','Di','Mi','Do','Fr','Sa'];
@@ -242,11 +243,14 @@ function migrateData(data) {
 }
 
 // ── Export ───────────────────────────────────────────────────────────────────
+const slugify = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+const triggerDownload = (url, fname) => Object.assign(document.createElement('a'), { href: url, download: fname }).click();
+
 function exportSVG(el) {
   if (!el) return;
   const c = el.cloneNode(true); c.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   const url = URL.createObjectURL(new Blob([c.outerHTML], { type: 'image/svg+xml' }));
-  Object.assign(document.createElement('a'), { href: url, download: 'timeline.svg' }).click();
+  triggerDownload(url, 'timeline.svg');
   URL.revokeObjectURL(url);
 }
 
@@ -261,10 +265,50 @@ function exportPNG(el, scale = 2) {
     const cv = document.createElement('canvas'); cv.width = w * scale; cv.height = h * scale;
     const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.drawImage(img, 0, 0, cv.width, cv.height);
-    cv.toBlob(b => Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: 'timeline.png' }).click());
+    cv.toBlob(b => triggerDownload(URL.createObjectURL(b), 'timeline.png'));
     URL.revokeObjectURL(url);
   };
   img.src = url;
+}
+
+function exportICS(project) {
+  const esc = s => (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  const fmtDt = s => s.replace(/-/g, '');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Timeline Visualizer//EN', 'CALSCALE:GREGORIAN'];
+
+  project.activities.forEach(act => {
+    const descParts = [];
+    project.dimensions.forEach(dim => {
+      const ids = act.assignments?.[dim.id] || [];
+      if (ids.length) {
+        const names = ids.map(id => dim.items.find(it => it.id === id)?.name).filter(Boolean);
+        if (names.length) descParts.push(`${dim.name}: ${names.join(', ')}`);
+      }
+    });
+    if (act.note) descParts.push(act.note);
+    // iCal spec: DTEND for all-day events is exclusive
+    const endExcl = fmtDt(addDays(act.endDate, 1));
+    lines.push('BEGIN:VEVENT',
+      `UID:${act.id}@timeline-viz`,
+      `SUMMARY:${esc(act.name)}`,
+      `DTSTART;VALUE=DATE:${fmtDt(act.startDate)}`,
+      `DTEND;VALUE=DATE:${endExcl}`,
+      ...(descParts.length ? [`DESCRIPTION:${esc(descParts.join('\\n'))}`] : []),
+      'END:VEVENT');
+  });
+
+  project.milestones.forEach(ms => {
+    lines.push('BEGIN:VEVENT',
+      `UID:ms-${ms.id}@timeline-viz`,
+      `SUMMARY:⚑ ${esc(ms.label)}`,
+      `DTSTART;VALUE=DATE:${fmtDt(ms.date)}`,
+      `DTEND;VALUE=DATE:${fmtDt(ms.date)}`,
+      'END:VEVENT');
+  });
+
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  triggerDownload(URL.createObjectURL(blob), `timeline-${slugify(project.name)}.ics`);
 }
 
 // ── UI Primitives ───────────────────────────────────────────────────────────
@@ -303,19 +347,20 @@ function CollapsibleSection({ title, count, defaultOpen, storageKey, children, a
   </div>);
 }
 
-function ExportDropdown({ onSVG, onPNG, onJSONCurrent, onJSONAll, onImport }) {
+function ExportDropdown({ onSVG, onPNG, onJSONCurrent, onJSONAll, onICS, onImport }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => { if (!open) return; const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, [open]);
   const act = fn => { fn(); setOpen(false); };
   return (<div className="dropdown-wrap" ref={ref}>
-    <button className="btn btn-sm" onClick={() => setOpen(!open)}>Export ▾</button>
+    <button className="btn btn-sm" onClick={() => setOpen(!open)}>⇅ ▾</button>
     {open && <div className="dropdown-menu">
       <div className="dropdown-item" onClick={() => act(onSVG)}><span className="dd-icon">⤓</span>SVG<span className="dd-hint">aktuelle Ansicht</span></div>
       <div className="dropdown-item" onClick={() => act(onPNG)}><span className="dd-icon">⤓</span>PNG<span className="dd-hint">aktuelle Ansicht</span></div>
       <div className="dropdown-sep"></div>
-      <div className="dropdown-item" onClick={() => act(onJSONCurrent)}><span className="dd-icon">{ }</span>JSON<span className="dd-hint">aktuelles Projekt</span></div>
-      <div className="dropdown-item" onClick={() => act(onJSONAll)}><span className="dd-icon">{ }</span>JSON<span className="dd-hint">alle Projekte</span></div>
+      <div className="dropdown-item" onClick={() => act(onJSONCurrent)}><span className="dd-icon">⤓</span>JSON<span className="dd-hint">aktuelles Projekt</span></div>
+      <div className="dropdown-item" onClick={() => act(onJSONAll)}><span className="dd-icon">⤓</span>JSON<span className="dd-hint">alle Projekte</span></div>
+      <div className="dropdown-item" onClick={() => act(onICS)}><span className="dd-icon">📅</span>ICS<span className="dd-hint">Kalender-Export</span></div>
       <div className="dropdown-sep"></div>
       <div className="dropdown-item" onClick={() => act(onImport)}><span className="dd-icon">⤒</span>JSON importieren</div>
     </div>}
@@ -438,7 +483,7 @@ function MilestoneManager({ milestones, onChange }) {
 }
 
 // ── Timeline SVG ────────────────────────────────────────────────────────────
-function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate, totalDays, svgRef, forExport, onEditAct }) {
+function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate, totalDays, svgRef, forExport, onEditAct, hiddenItems = EMPTY_SET }) {
   const [tooltip, setTooltip] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [highlightedLane, setHighlightedLane] = useState(null);
@@ -448,10 +493,11 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
   const colorDim = project.dimensions.find(d => d.id === colorByDimId);
   const colorDimIdx = project.dimensions.findIndex(d => d.id === colorByDimId);
 
+  const isVisible = a => { if (forExport || !hiddenItems.size) return true; const refs = a.assignments[colorByDimId] || []; return !refs.length || refs.some(id => !hiddenItems.has(id)); };
   const lanes = (groupDim ? groupDim.items : []).map(item => ({
-    item, activities: project.activities.filter(a => (a.assignments[groupByDimId] || []).includes(item.id)),
+    item, activities: project.activities.filter(a => isVisible(a) && (a.assignments[groupByDimId] || []).includes(item.id)),
   }));
-  const unassigned = project.activities.filter(a => !(a.assignments[groupByDimId] || []).length);
+  const unassigned = project.activities.filter(a => isVisible(a) && !(a.assignments[groupByDimId] || []).length);
   if (unassigned.length) lanes.push({ item: { id: '_none', name: '(nicht zugeordnet)' }, activities: unassigned });
 
   const kwH = 14, hdrH = 48 + kwH, monthH = 20, msFooterH = (project.milestones || []).length ? 28 : 0;
@@ -480,7 +526,8 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
   function barColor(act) {
     if (!colorDim) return '#868e96';
     const refs = act.assignments[colorByDimId] || []; if (!refs.length) return '#868e96';
-    const idx = colorDim.items.findIndex(c => c.id === refs[0]);
+    const activeRef = refs.find(id => !hiddenItems.has(id)) ?? refs[0];
+    const idx = colorDim.items.findIndex(c => c.id === activeRef);
     return idx >= 0 ? getColor(colorDimIdx, idx) : '#868e96';
   }
 
@@ -494,7 +541,8 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
 
   const onMM = useCallback(e => setTooltipPos({ x: e.clientX, y: e.clientY }), []);
   const barH = 26, gap = 2, laneBase = 52;
-  const laneHeights = lanes.map(l => Math.max(laneBase, Math.max(1, stack(l.activities).length) * (barH + gap) + 12));
+  const laneStacks = lanes.map(l => stack(l.activities));
+  const laneHeights = laneStacks.map(s => Math.max(laneBase, Math.max(1, s.length) * (barH + gap) + 12));
   const lanesH = laneHeights.reduce((s, h) => s + h, 0);
   const totalH = monthH + hdrH + lanesH + msFooterH;
 
@@ -544,23 +592,11 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
         </g>); })}
       <line x1={0} y1={monthH + hdrH - 4} x2={svgW} y2={monthH + hdrH - 4} stroke={c.gridMonth} strokeWidth={1} />
 
-      {/* Lanes + bars */}
+      {/* Lane backgrounds */}
       {(() => { let y = monthH + hdrH; return lanes.map((lane, li) => { const h = laneHeights[li]; const ly = y; y += h;
-        const isHL = !forExport && highlightedLane === lane.item.id;
-        return (<g key={lane.item.id}>
+        return (<g key={'bg-' + lane.item.id}>
           <rect x={0} y={ly} width={svgW} height={h} fill={li % 2 === 0 ? c.laneEven : c.laneOdd} />
           <line x1={0} y1={ly + h} x2={svgW} y2={ly + h} stroke={c.laneSep} strokeWidth={1} />
-          <text x={12} y={ly + h / 2 + 4} fontSize="12" fontWeight="500" fill={c.labelText}>{lane.item.name}</text>
-          <line x1={lblW - 1} y1={ly} x2={lblW - 1} y2={ly + h} stroke={c.labelSep} strokeWidth={1} />
-          {isHL && <rect x={lblW} y={ly + 1} width={svgW - lblW} height={h - 2} fill="none" stroke="#e03131" strokeWidth={2} opacity={0.6} style={{ pointerEvents: 'none' }} />}
-          {stack(lane.activities).map((row, ri) => row.map(act => {
-            const s = daysBetween(startDate, act.startDate), dur = daysBetween(act.startDate, act.endDate) + 1;
-            const bx = lblW + s * dayWidth + 1, bw = Math.max(dur * dayWidth - 2, 4), by = ly + 6 + ri * (barH + gap), col = barColor(act);
-            return (<g key={act.id} onMouseEnter={() => !forExport && setTooltip({ name: act.name, startDate: act.startDate, endDate: act.endDate, details: details(act), note: act.note })} onMouseLeave={() => !forExport && setTooltip(null)} onClick={() => !forExport && onEditAct && onEditAct(act)} style={{ cursor: forExport ? 'default' : 'pointer' }}>
-              <rect x={bx} y={by} width={bw} height={barH} rx={4} fill={col} opacity={0.88} />
-              {bw > 40 && <text x={bx + 6} y={by + barH / 2 + 4} fontSize="11" fontWeight="500" fill="#fff">{act.name.length > Math.floor(bw / 7) ? act.name.slice(0, Math.floor(bw / 7) - 1) + '…' : act.name}</text>}
-              {act.note && bw > 20 && <circle cx={bx + bw - 8} cy={by + barH / 2} r={3} fill="rgba(255,255,255,0.75)" />}
-            </g>); }))}
         </g>); }); })()}
 
       {/* Milestones */}
@@ -579,19 +615,37 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
           <circle cx={tx} cy={top} r={3} fill="#f59f00" opacity={0.9} />
         </g>);
       })()}
+
+      {/* Lane labels + bars */}
+      {(() => { let y = monthH + hdrH; return lanes.map((lane, li) => { const h = laneHeights[li]; const ly = y; y += h;
+        const isHL = !forExport && highlightedLane === lane.item.id;
+        return (<g key={lane.item.id}>
+          <text x={12} y={ly + h / 2 + 4} fontSize="12" fontWeight="500" fill={c.labelText}>{lane.item.name}</text>
+          <line x1={lblW - 1} y1={ly} x2={lblW - 1} y2={ly + h} stroke={c.labelSep} strokeWidth={1} />
+          {isHL && <rect x={lblW} y={ly + 1} width={svgW - lblW} height={h - 2} fill="none" stroke="#e03131" strokeWidth={2} opacity={0.6} style={{ pointerEvents: 'none' }} />}
+          {laneStacks[li].map((row, ri) => row.map(act => {
+            const s = daysBetween(startDate, act.startDate), dur = daysBetween(act.startDate, act.endDate) + 1;
+            const bx = lblW + s * dayWidth + 1, bw = Math.max(dur * dayWidth - 2, 4), by = ly + 6 + ri * (barH + gap), col = barColor(act);
+            return (<g key={act.id} onMouseEnter={() => !forExport && setTooltip({ name: act.name, startDate: act.startDate, endDate: act.endDate, details: details(act), note: act.note })} onMouseLeave={() => !forExport && setTooltip(null)} onClick={() => !forExport && onEditAct && onEditAct(act)} style={{ cursor: forExport ? 'default' : 'pointer' }}>
+              <rect x={bx} y={by} width={bw} height={barH} rx={4} fill={col} opacity={0.88} />
+              {bw > 40 && <text x={bx + 6} y={by + barH / 2 + 4} fontSize="11" fontWeight="500" fill="#fff">{act.name.length > Math.floor(bw / 7) ? act.name.slice(0, Math.floor(bw / 7) - 1) + '…' : act.name}</text>}
+              {act.note && bw > 20 && <circle cx={bx + bw - 8} cy={by + barH / 2} r={3} fill="rgba(255,255,255,0.75)" />}
+            </g>); }))}
+        </g>); }); })()}
     </svg>
     {!forExport && tooltip && <Tooltip data={tooltip} pos={tooltipPos} />}
   </div>);
 }
 
-function Legend({ project, colorByDimId }) {
+function Legend({ project, colorByDimId, hiddenItems, onToggleItem }) {
   const dim = project.dimensions.find(d => d.id === colorByDimId);
   const di = project.dimensions.indexOf(dim);
   if (!dim || !dim.items.length) return null;
   return (<div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '6px 0' }}>
     <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, alignSelf: 'center' }}>Farbe = {dim.name}:</span>
-    {dim.items.map((item, idx) => <span key={item.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
-      <span style={{ width: 10, height: 10, borderRadius: 3, background: getColor(di, idx), flexShrink: 0 }}></span>{item.name}</span>)}
+    {dim.items.map((item, idx) => { const hidden = hiddenItems.has(item.id); const col = getColor(di, idx);
+      return (<span key={item.id} onClick={() => onToggleItem(item.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', opacity: hidden ? 0.35 : 1, textDecoration: hidden ? 'line-through' : 'none', userSelect: 'none' }}>
+        <span style={{ width: 10, height: 10, borderRadius: 3, background: col, flexShrink: 0 }}></span>{item.name}</span>); })}
   </div>);
 }
 
@@ -602,6 +656,8 @@ function App() {
   const [activeProjectId, setActiveProjectId] = useState(initial.activeProjectId);
   const [groupByDimId, setGroupByDimId] = useState('');
   const [colorByDimId, setColorByDimId] = useState('');
+  const [hiddenItems, setHiddenItems] = useState(new Set());
+  const toggleHiddenItem = id => setHiddenItems(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   const [dayWidth, setDayWidth] = useState(32);
   const [showActForm, setShowActForm] = useState(false);
   const [editingAct, setEditingAct] = useState(null);
@@ -698,8 +754,8 @@ function App() {
   const deleteActivity = id => updateProject({ ...project, activities: project.activities.filter(a => a.id !== id) });
 
   // Import / Export
-  const expJSONAll = () => { const b = new Blob([JSON.stringify({ projects, activeProjectId }, null, 2)], { type: 'application/json' }); Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: 'timeline-all.json' }).click(); };
-  const expJSONCurrent = () => { const d = { projects: [project], activeProjectId: project.id }; const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: `timeline-${project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json` }).click(); };
+  const expJSONAll = () => { const b = new Blob([JSON.stringify({ projects, activeProjectId }, null, 2)], { type: 'application/json' }); triggerDownload(URL.createObjectURL(b), 'timeline-all.json'); };
+  const expJSONCurrent = () => { const d = { projects: [project], activeProjectId: project.id }; const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); triggerDownload(URL.createObjectURL(b), `timeline-${slugify(project.name)}.json`); };
   const impJSON = e => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = migrateData(JSON.parse(ev.target.result)); if (!d?.projects?.length) { alert('Keine Projekte gefunden.'); return; } setImportData({ data: d, fileName: f.name }); } catch (err) { alert('Import fehlgeschlagen: ' + err.message); } }; r.readAsText(f); e.target.value = ''; };
   const impReplace = () => { if (!importData) return; setProjects(importData.data.projects); setActiveProjectId(importData.data.activeProjectId || importData.data.projects[0]?.id); setImportData(null); };
   const impMerge = () => { if (!importData) return; const m = [...projects]; importData.data.projects.forEach(ip => { const i = m.findIndex(p => p.id === ip.id); if (i >= 0) m[i] = ip; else m.push(ip); }); setProjects(m); setActiveProjectId(importData.data.projects[0]?.id || activeProjectId); setImportData(null); };
@@ -710,6 +766,7 @@ function App() {
   const scrollToday = () => { if (!timelineRef.current) return; timelineRef.current.scrollLeft = Math.max(0, daysBetween(startDate, todayStr()) * dayWidth - timelineRef.current.clientWidth / 2); };
   const doExportSVG = () => setTimeout(() => exportSVG(exportSvgRef.current), 50);
   const doExportPNG = () => setTimeout(() => exportPNG(exportSvgRef.current), 50);
+  const doExportICS = () => exportICS(project);
 
   const hasData = project && (project.activities.length > 0 || (project.milestones || []).length > 0);
 
@@ -740,7 +797,7 @@ function App() {
           {dims.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
         {dims.length > 1 && <>
           <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Farbe:</span>
-          <select className="select" value={colorByDimId} onChange={e => setColorByDimId(e.target.value)} style={{ width: 130 }}>
+          <select className="select" value={colorByDimId} onChange={e => { setColorByDimId(e.target.value); setHiddenItems(new Set()); }} style={{ width: 130 }}>
             {dims.filter(d => d.id !== groupByDimId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
         </>}
       </>}
@@ -753,7 +810,7 @@ function App() {
       <button className="btn btn-sm btn-icon" onClick={zoomIn} title="Vergrößern">+</button>
       <button className="btn btn-sm" onClick={scrollToday}>Heute</button>
       <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 2px' }}></div>
-      <ExportDropdown onSVG={doExportSVG} onPNG={doExportPNG} onJSONCurrent={expJSONCurrent} onJSONAll={expJSONAll} onImport={() => fileInputRef.current?.click()} />
+      <ExportDropdown onSVG={doExportSVG} onPNG={doExportPNG} onJSONCurrent={expJSONCurrent} onJSONAll={expJSONAll} onICS={doExportICS} onImport={() => fileInputRef.current?.click()} />
       <input ref={fileInputRef} type="file" accept=".json" onChange={impJSON} style={{ display: 'none' }} />
     </div>
 
@@ -791,12 +848,12 @@ function App() {
       {/* Timeline */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-card)' }}>
         {hasData && dims.length > 1 && <div style={{ padding: '4px 16px', borderBottom: '1px solid var(--border-light)', flexShrink: 0, background: 'var(--bg-card)', zIndex: 3 }}>
-          <Legend project={project} colorByDimId={colorByDimId} /></div>}
+          <Legend project={project} colorByDimId={colorByDimId} hiddenItems={hiddenItems} onToggleItem={toggleHiddenItem} /></div>}
         <div style={{ flex: 1, overflow: 'auto' }} ref={timelineRef}>
           {!hasData || !dims.length
             ? <div className="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>Noch keine Timeline-Daten</div><div style={{ fontSize: 13 }}>{!dims.length ? 'Lege links Dimensionen an.' : 'Erstelle Aktivitäten.'}</div></div>
-            : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} onEditAct={act => { setEditingAct(act); setShowActForm(true); }} />}
+            : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} onEditAct={act => { setEditingAct(act); setShowActForm(true); }} hiddenItems={hiddenItems} />}
         </div>
       </div>
     </div>
