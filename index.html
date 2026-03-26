@@ -648,12 +648,22 @@ function App() {
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   }, [doUndo, doRedo]);
 
-  // Auto-select dims
+  // Auto-select dims (restore saved view per project)
   useEffect(() => {
     if (!dims.length) { setGroupByDimId(''); setColorByDimId(''); return; }
-    if (!dims.find(d => d.id === groupByDimId)) setGroupByDimId(dims[0].id);
-    if (!dims.find(d => d.id === colorByDimId) || colorByDimId === groupByDimId) { const o = dims.find(d => d.id !== groupByDimId); setColorByDimId(o ? o.id : dims[0].id); }
-  }, [dims, groupByDimId, colorByDimId]);
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('tl-view-' + activeProjectId)); } catch {}
+    const sg = saved?.groupByDimId, sc = saved?.colorByDimId;
+    if (!dims.find(d => d.id === groupByDimId)) setGroupByDimId(dims.find(d => d.id === sg)?.id || dims[0].id);
+    if (!dims.find(d => d.id === colorByDimId) || colorByDimId === groupByDimId) {
+      const fallback = dims.find(d => d.id !== groupByDimId);
+      setColorByDimId(dims.find(d => d.id === sc && d.id !== groupByDimId)?.id || (fallback ? fallback.id : dims[0].id));
+    }
+  }, [dims, groupByDimId, colorByDimId, activeProjectId]);
+  // Save view settings per project
+  useEffect(() => {
+    if (activeProjectId && groupByDimId) try { localStorage.setItem('tl-view-' + activeProjectId, JSON.stringify({ groupByDimId, colorByDimId })); } catch {}
+  }, [activeProjectId, groupByDimId, colorByDimId]);
 
   // Persist + history tracking
   useEffect(() => {
@@ -667,6 +677,8 @@ function App() {
     prevRef.current = JSON.parse(JSON.stringify(projects)); prevIdRef.current = activeProjectId;
     saveData({ projects, activeProjectId });
   }, [projects]);
+  // Also save when active project switches (no project data change)
+  useEffect(() => { saveData({ projects, activeProjectId }); }, [activeProjectId]);
 
   // Date range
   const { startDate, totalDays } = useMemo(() => {
