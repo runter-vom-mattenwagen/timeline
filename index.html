@@ -568,7 +568,7 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
         const mx = lblW + mi * dayWidth + dayWidth / 2, top = monthH + hdrH - 4, bot = monthH + hdrH + lanesH;
         return (<g key={ms.id}><line x1={mx} y1={top} x2={mx} y2={bot + 2} stroke="#e03131" strokeWidth={1.5} opacity={0.7} />
           <circle cx={mx} cy={top} r={3} fill="#e03131" opacity={0.8} />
-          {msFooterH > 0 && <text x={mx} y={bot + 16} textAnchor="middle" fontSize="9" fontWeight="600" fill="#e03131" opacity={0.85}>{ms.label.length > Math.floor(dayWidth * 2 / 6) ? ms.label.slice(0, Math.floor(dayWidth * 2 / 6) - 1) + '…' : ms.label}</text>}
+          {msFooterH > 0 && <text x={mx} y={bot + 16} textAnchor="middle" fontSize="9" fontWeight="600" fill="#e03131" opacity={0.85}>{ms.label}</text>}
         </g>); })}
 
       {/* Today */}
@@ -672,7 +672,8 @@ function App() {
   const { startDate, totalDays } = useMemo(() => {
     const dates = [];
     if (project) { project.activities.forEach(a => dates.push(a.startDate, a.endDate)); (project.milestones || []).forEach(m => dates.push(m.date)); }
-    if (!dates.length) { const t = todayStr(); return { startDate: addDays(t, -7), totalDays: 42 }; }
+    dates.push(todayStr());
+    if (dates.length === 1) { const t = todayStr(); return { startDate: addDays(t, -7), totalDays: 42 }; }
     let mn = dates[0], mx = dates[0]; dates.forEach(d => { if (d < mn) mn = d; if (d > mx) mx = d; });
     const pad = addDays(mn, -3); return { startDate: pad, totalDays: Math.max(daysBetween(pad, addDays(mx, 5)), 14) };
   }, [project]);
