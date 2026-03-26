@@ -162,7 +162,7 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 
 // ── Colors ──────────────────────────────────────────────────────────────────
 const COLOR_POOL = [
@@ -274,6 +274,7 @@ function Tooltip({ data, pos }) {
     <div style={{ fontWeight: 600, marginBottom: 2 }}>{data.name}</div>
     <div style={{ opacity: 0.8 }}>{data.startDate} → {data.endDate}</div>
     {data.details && <div style={{ marginTop: 4, opacity: 0.7 }}>{data.details}</div>}
+    {data.note && <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.2)', opacity: 0.85, whiteSpace: 'pre-wrap' }}>{data.note}</div>}
   </div>);
 }
 
@@ -330,8 +331,9 @@ function ActivityForm({ activity, project, onSave, onDelete, onClone, onClose })
   const setStartDate = sd => { _setStart(sd); if (sd > endDate) _setEnd(sd); };
   const setEndDate = ed => { if (ed >= startDate) _setEnd(ed); };
   const [assignments, setAssignments] = useState(activity?.assignments || {});
+  const [note, setNote] = useState(activity?.note || '');
   const toggle = (dimId, itemId) => { const c = assignments[dimId] || []; setAssignments({ ...assignments, [dimId]: c.includes(itemId) ? c.filter(x => x !== itemId) : [...c, itemId] }); };
-  const save = () => { if (!name.trim()) return; onSave({ id: activity?.id || genId(), name: name.trim(), startDate, endDate, assignments }); onClose(); };
+  const save = () => { if (!name.trim()) return; onSave({ id: activity?.id || genId(), name: name.trim(), startDate, endDate, assignments, ...(note.trim() ? { note: note.trim() } : {}) }); onClose(); };
 
   return (<Modal onClose={onClose}>
     <h3>{isEdit ? 'Aktivität bearbeiten' : 'Neue Aktivität'}</h3>
@@ -347,9 +349,11 @@ function ActivityForm({ activity, project, onSave, onDelete, onClone, onClose })
           <input type="checkbox" checked={sel} onChange={() => toggle(dim.id, item.id)} />
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0 }}></span>{item.name}</label>);
       })}</div></div>)}
+    <div className="field"><label>Notiz</label>
+      <textarea className="input" value={note} onChange={e => setNote(e.target.value)} placeholder="Optionale Anmerkungen…" rows={3} style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }} /></div>
     <div className="actions">
       {isEdit && <button className="btn btn-danger" onClick={() => { onDelete(activity.id); onClose(); }}>Löschen</button>}
-      {isEdit && <button className="btn" onClick={() => onClone({ id: genId(), name: name.trim() + ' (Kopie)', startDate, endDate, assignments: JSON.parse(JSON.stringify(assignments)) })}>Klonen</button>}
+      {isEdit && <button className="btn" onClick={() => onClone({ id: genId(), name: name.trim() + ' (Kopie)', startDate, endDate, assignments: JSON.parse(JSON.stringify(assignments)), ...(note.trim() ? { note: note.trim() } : {}) })}>Klonen</button>}
       <div style={{ flex: 1 }}></div>
       <button className="btn" onClick={onClose}>Abbrechen</button>
       <button className="btn btn-primary" onClick={save}>{isEdit ? 'Speichern' : 'Anlegen'}</button>
@@ -434,7 +438,7 @@ function MilestoneManager({ milestones, onChange }) {
 }
 
 // ── Timeline SVG ────────────────────────────────────────────────────────────
-function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate, totalDays, svgRef, forExport }) {
+function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate, totalDays, svgRef, forExport, onEditAct }) {
   const [tooltip, setTooltip] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [highlightedLane, setHighlightedLane] = useState(null);
@@ -552,9 +556,10 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
           {stack(lane.activities).map((row, ri) => row.map(act => {
             const s = daysBetween(startDate, act.startDate), dur = daysBetween(act.startDate, act.endDate) + 1;
             const bx = lblW + s * dayWidth + 1, bw = Math.max(dur * dayWidth - 2, 4), by = ly + 6 + ri * (barH + gap), col = barColor(act);
-            return (<g key={act.id} onMouseEnter={() => !forExport && setTooltip({ name: act.name, startDate: act.startDate, endDate: act.endDate, details: details(act) })} onMouseLeave={() => !forExport && setTooltip(null)} style={{ cursor: forExport ? 'default' : 'pointer' }}>
+            return (<g key={act.id} onMouseEnter={() => !forExport && setTooltip({ name: act.name, startDate: act.startDate, endDate: act.endDate, details: details(act), note: act.note })} onMouseLeave={() => !forExport && setTooltip(null)} onClick={() => !forExport && onEditAct && onEditAct(act)} style={{ cursor: forExport ? 'default' : 'pointer' }}>
               <rect x={bx} y={by} width={bw} height={barH} rx={4} fill={col} opacity={0.88} />
               {bw > 40 && <text x={bx + 6} y={by + barH / 2 + 4} fontSize="11" fontWeight="500" fill="#fff">{act.name.length > Math.floor(bw / 7) ? act.name.slice(0, Math.floor(bw / 7) - 1) + '…' : act.name}</text>}
+              {act.note && bw > 20 && <circle cx={bx + bw - 8} cy={by + barH / 2} r={3} fill="rgba(255,255,255,0.75)" />}
             </g>); }))}
         </g>); }); })()}
 
@@ -772,7 +777,7 @@ function App() {
           {!hasData || !dims.length
             ? <div className="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>Noch keine Timeline-Daten</div><div style={{ fontSize: 13 }}>{!dims.length ? 'Lege links Dimensionen an.' : 'Erstelle Aktivitäten.'}</div></div>
-            : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} />}
+            : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} onEditAct={act => { setEditingAct(act); setShowActForm(true); }} />}
         </div>
       </div>
     </div>
