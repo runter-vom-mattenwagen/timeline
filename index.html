@@ -435,6 +435,7 @@ function MilestoneManager({ milestones, onChange }) {
 function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate, totalDays, svgRef, forExport }) {
   const [tooltip, setTooltip] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [highlightedLane, setHighlightedLane] = useState(null);
   const c = forExport ? EXPORT_COLORS : getThemeColors();
 
   const groupDim = project.dimensions.find(d => d.id === groupByDimId);
@@ -492,16 +493,19 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
   const totalH = monthH + hdrH + lanesH + msFooterH;
 
   // Sticky label overlay (display mode only)
-  const labelOverlay = (<div style={{ position: 'sticky', left: 0, width: lblW + 1, height: totalH, zIndex: 5, pointerEvents: 'none' }}>
+  const labelOverlay = (<div style={{ position: 'sticky', left: 0, width: lblW + 1, height: totalH, zIndex: 5 }}>
     <svg width={lblW + 1} height={totalH} viewBox={`0 0 ${lblW + 1} ${totalH}`} style={{ display: 'block', fontFamily: "'DM Sans', sans-serif" }}>
-      <rect width={lblW + 1} height={monthH + hdrH} fill={c.bg} />
+      <rect width={lblW + 1} height={monthH + hdrH} fill={c.bg} style={{ pointerEvents: 'none' }} />
       {(() => { let y = monthH + hdrH; return lanes.map((l, i) => { const h = laneHeights[i]; const cy = y; y += h;
-        return (<g key={'lbl-' + l.item.id}><rect x={0} y={cy} width={lblW + 1} height={h} fill={i % 2 === 0 ? c.laneEven : c.laneOdd} />
+        const isHL = !forExport && highlightedLane === l.item.id;
+        return (<g key={'lbl-' + l.item.id} onClick={() => !forExport && setHighlightedLane(isHL ? null : l.item.id)} style={{ cursor: forExport ? 'default' : 'pointer' }}>
+          <rect x={0} y={cy} width={lblW + 1} height={h} fill={i % 2 === 0 ? c.laneEven : c.laneOdd} />
           <line x1={0} y1={cy + h} x2={lblW + 1} y2={cy + h} stroke={c.laneSep} strokeWidth={1} />
-          <text x={12} y={cy + h / 2 + 4} fontSize="12" fontWeight="500" fill={c.labelText}>{l.item.name}</text></g>);
+          <text x={12} y={cy + h / 2 + 4} fontSize="12" fontWeight={isHL ? "700" : "500"} fill={isHL ? '#e03131' : c.labelText}>{l.item.name}</text>
+        </g>);
       }); })()}
-      {msFooterH > 0 && <rect y={monthH + hdrH + lanesH} width={lblW + 1} height={msFooterH} fill={c.bg} />}
-      <line x1={lblW} y1={0} x2={lblW} y2={totalH} stroke={c.labelSep} strokeWidth={1} />
+      {msFooterH > 0 && <rect y={monthH + hdrH + lanesH} width={lblW + 1} height={msFooterH} fill={c.bg} style={{ pointerEvents: 'none' }} />}
+      <line x1={lblW} y1={0} x2={lblW} y2={totalH} stroke={c.labelSep} strokeWidth={1} style={{ pointerEvents: 'none' }} />
     </svg>
   </div>);
 
@@ -536,11 +540,13 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
 
       {/* Lanes + bars */}
       {(() => { let y = monthH + hdrH; return lanes.map((lane, li) => { const h = laneHeights[li]; const ly = y; y += h;
+        const isHL = !forExport && highlightedLane === lane.item.id;
         return (<g key={lane.item.id}>
           <rect x={0} y={ly} width={svgW} height={h} fill={li % 2 === 0 ? c.laneEven : c.laneOdd} />
           <line x1={0} y1={ly + h} x2={svgW} y2={ly + h} stroke={c.laneSep} strokeWidth={1} />
           <text x={12} y={ly + h / 2 + 4} fontSize="12" fontWeight="500" fill={c.labelText}>{lane.item.name}</text>
           <line x1={lblW - 1} y1={ly} x2={lblW - 1} y2={ly + h} stroke={c.labelSep} strokeWidth={1} />
+          {isHL && <rect x={lblW} y={ly + 1} width={svgW - lblW} height={h - 2} fill="none" stroke="#e03131" strokeWidth={2} opacity={0.6} style={{ pointerEvents: 'none' }} />}
           {stack(lane.activities).map((row, ri) => row.map(act => {
             const s = daysBetween(startDate, act.startDate), dur = daysBetween(act.startDate, act.endDate) + 1;
             const bx = lblW + s * dayWidth + 1, bw = Math.max(dur * dayWidth - 2, 4), by = ly + 6 + ri * (barH + gap), col = barColor(act);
