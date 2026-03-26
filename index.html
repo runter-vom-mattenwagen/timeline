@@ -142,7 +142,7 @@
     .collapsible-chevron.open { transform: rotate(90deg); }
     .collapsible-body { overflow: hidden; transition: max-height 0.25s ease, opacity 0.2s ease; }
     .collapsible-body.collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; }
-    .collapsible-body.expanded { opacity: 1; }
+    .collapsible-body.expanded { opacity: 1; overflow: visible; }
 
     /* Logo tooltip */
     .logo-wrap { position: relative; }
@@ -572,7 +572,13 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
         </g>); })}
 
       {/* Today */}
-      {todayIdx >= 0 && todayIdx < totalDays && <line x1={lblW + todayIdx * dayWidth + dayWidth / 2} y1={monthH + hdrH - 4} x2={lblW + todayIdx * dayWidth + dayWidth / 2} y2={monthH + hdrH + lanesH} stroke="#e03131" strokeWidth={2} strokeDasharray="4 3" opacity={0.45} />}
+      {todayIdx >= 0 && todayIdx < totalDays && (() => {
+        const tx = lblW + todayIdx * dayWidth + dayWidth / 2, top = monthH + hdrH - 4, bot = monthH + hdrH + lanesH;
+        return (<g>
+          <line x1={tx} y1={top} x2={tx} y2={bot + 2} stroke="#f59f00" strokeWidth={1.5} opacity={0.85} />
+          <circle cx={tx} cy={top} r={3} fill="#f59f00" opacity={0.9} />
+        </g>);
+      })()}
     </svg>
     {!forExport && tooltip && <Tooltip data={tooltip} pos={tooltipPos} />}
   </div>);
