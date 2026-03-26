@@ -143,6 +143,14 @@
     .collapsible-body { overflow: hidden; transition: max-height 0.25s ease, opacity 0.2s ease; }
     .collapsible-body.collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; }
     .collapsible-body.expanded { opacity: 1; }
+
+    /* Logo tooltip */
+    .logo-wrap { position: relative; }
+    .logo-tip { display: none; position: absolute; top: 100%; left: 0; margin-top: 8px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); width: 340px; z-index: 60; font-size: 12px; line-height: 1.6; color: var(--text-secondary); animation: dropIn 0.12s ease; }
+    .logo-wrap:hover .logo-tip { display: block; }
+    .logo-tip a { color: var(--accent); text-decoration: none; font-weight: 600; font-family: var(--font-mono); font-size: 11px; }
+    .logo-tip a:hover { text-decoration: underline; }
+    .logo-tip .logo-desc { margin-top: 6px; }
     .section-title { font-size: 13px; font-weight: 600; }
     .section-sep { border-top: 1px solid var(--border-light); padding-top: 14px; margin-top: 14px; }
   </style>
@@ -675,9 +683,13 @@ function App() {
   return (<div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
     {/* Toolbar */}
     <div style={{ height: 50, background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="logo-wrap" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5"><path d="M3 6h18M3 12h13M3 18h8"/></svg>
         <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--accent)' }}>Timeline</span>
+        <div className="logo-tip">
+          <a href="https://github.com/runter-vom-mattenwagen/timeline" target="_blank" rel="noopener">github.com/runter-vom-mattenwagen/timeline</a>
+          <div className="logo-desc">A pivot-based timeline visualization tool — plot activities across dynamic dimensions and switch perspectives instantly. Not a project management tool, but a fast visual thinking aid for temporal planning.</div>
+        </div>
       </div>
       <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }}></div>
       <select className="select" value={activeProjectId} onChange={e => setActiveProjectId(e.target.value)} style={{ maxWidth: 200 }}>
