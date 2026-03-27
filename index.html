@@ -150,6 +150,8 @@
     .logo-tip { display: none; position: absolute; top: 100%; left: 0; padding: 12px 16px; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); width: 340px; z-index: 60; font-size: 12px; line-height: 1.6; color: var(--text-secondary); animation: dropIn 0.12s ease; }
     .logo-tip::before { content: ''; position: absolute; top: -8px; left: 0; width: 100%; height: 8px; }
     .logo-wrap:hover .logo-tip { display: block; }
+    .lane-lbl .lane-sort-btn { opacity: 0; transition: opacity 0.15s; }
+    .lane-lbl:hover .lane-sort-btn { opacity: 0.35; }
     .logo-tip a { color: var(--accent); text-decoration: none; font-weight: 600; font-family: var(--font-mono); font-size: 11px; }
     .logo-tip a:hover { text-decoration: underline; }
     .logo-tip .logo-desc { margin-top: 6px; }
@@ -484,7 +486,7 @@ function MilestoneManager({ milestones, onChange }) {
 }
 
 // ── Timeline SVG ────────────────────────────────────────────────────────────
-function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate, totalDays, svgRef, forExport, onEditAct, hiddenItems = EMPTY_SET }) {
+function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate, totalDays, svgRef, forExport, onEditAct, onMoveLane, hiddenItems = EMPTY_SET }) {
   const [tooltip, setTooltip] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [highlightedLane, setHighlightedLane] = useState(null);
@@ -551,12 +553,18 @@ function TimelineSVG({ project, groupByDimId, colorByDimId, dayWidth, startDate,
   const labelOverlay = (<div style={{ position: 'sticky', left: 0, width: lblW + 1, height: totalH, zIndex: 5 }}>
     <svg width={lblW + 1} height={totalH} viewBox={`0 0 ${lblW + 1} ${totalH}`} style={{ display: 'block', fontFamily: "'DM Sans', sans-serif" }}>
       <rect width={lblW + 1} height={monthH + hdrH} fill={c.bg} style={{ pointerEvents: 'none' }} />
-      {(() => { let y = monthH + hdrH; return lanes.map((l, i) => { const h = laneHeights[i]; const cy = y; y += h;
+      {(() => { let y = monthH + hdrH; const realLanes = lanes.filter(l => l.item.id !== '_none'); return lanes.map((l, i) => { const h = laneHeights[i]; const cy = y; y += h;
         const isHL = !forExport && highlightedLane === l.item.id;
-        return (<g key={'lbl-' + l.item.id} onClick={() => !forExport && setHighlightedLane(isHL ? null : l.item.id)} style={{ cursor: forExport ? 'default' : 'pointer' }}>
-          <rect x={0} y={cy} width={lblW + 1} height={h} fill={i % 2 === 0 ? c.laneEven : c.laneOdd} />
+        const realIdx = realLanes.findIndex(rl => rl.item.id === l.item.id);
+        const canUp = realIdx > 0;
+        const canDown = realIdx !== -1 && realIdx < realLanes.length - 1;
+        const btnY = cy + h / 2;
+        return (<g key={'lbl-' + l.item.id} className={forExport ? '' : 'lane-lbl'}>
+          <rect x={0} y={cy} width={lblW + 1} height={h} fill={i % 2 === 0 ? c.laneEven : c.laneOdd} onClick={() => !forExport && setHighlightedLane(isHL ? null : l.item.id)} style={{ cursor: forExport ? 'default' : 'pointer' }} />
           <line x1={0} y1={cy + h} x2={lblW + 1} y2={cy + h} stroke={c.laneSep} strokeWidth={1} />
-          <text x={12} y={cy + h / 2 + 4} fontSize="12" fontWeight={isHL ? "700" : "500"} fill={isHL ? '#e03131' : c.labelText}>{l.item.name}</text>
+          <text x={12} y={btnY + 4} fontSize="12" fontWeight={isHL ? "700" : "500"} fill={isHL ? '#e03131' : c.labelText} onClick={() => !forExport && setHighlightedLane(isHL ? null : l.item.id)} style={{ cursor: forExport ? 'default' : 'pointer' }}>{l.item.name}</text>
+          {!forExport && onMoveLane && canUp && <path className="lane-sort-btn" d={`M${lblW-20},${cy+8} l6,10 l-12,0 z`} fill={c.labelText} onClick={e => { e.stopPropagation(); onMoveLane(l.item.id, -1); }} style={{ cursor: 'pointer' }} />}
+          {!forExport && onMoveLane && canDown && <path className="lane-sort-btn" d={`M${lblW-20},${cy+h-8} l6,-10 l-12,0 z`} fill={c.labelText} onClick={e => { e.stopPropagation(); onMoveLane(l.item.id, 1); }} style={{ cursor: 'pointer' }} />}
         </g>);
       }); })()}
       {msFooterH > 0 && <rect y={monthH + hdrH + lanesH} width={lblW + 1} height={msFooterH} fill={c.bg} style={{ pointerEvents: 'none' }} />}
@@ -753,6 +761,13 @@ function App() {
   const deleteProject = id => { if (projects.length <= 1) return; const r = projects.filter(p => p.id !== id); setProjects(r); if (activeProjectId === id) setActiveProjectId(r[0].id); };
   const saveActivity = act => { const exists = project.activities.find(a => a.id === act.id); updateProject({ ...project, activities: exists ? project.activities.map(a => a.id === act.id ? act : a) : [...project.activities, act] }); setEditingAct(null); };
   const deleteActivity = id => updateProject({ ...project, activities: project.activities.filter(a => a.id !== id) });
+  const moveLane = (itemId, dir) => {
+    const dim = project.dimensions.find(d => d.id === groupByDimId); if (!dim) return;
+    const idx = dim.items.findIndex(it => it.id === itemId); if (idx < 0) return;
+    const ni = idx + dir; if (ni < 0 || ni >= dim.items.length) return;
+    const items = [...dim.items]; [items[idx], items[ni]] = [items[ni], items[idx]];
+    updateProject({ ...project, dimensions: project.dimensions.map(d => d.id === groupByDimId ? { ...d, items } : d) });
+  };
 
   // Import / Export
   const expJSONAll = () => { const b = new Blob([JSON.stringify({ projects, activeProjectId }, null, 2)], { type: 'application/json' }); triggerDownload(URL.createObjectURL(b), 'timeline-all.json'); };
@@ -854,7 +869,7 @@ function App() {
           {!hasData || !dims.length
             ? <div className="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>Noch keine Timeline-Daten</div><div style={{ fontSize: 13 }}>{!dims.length ? 'Lege links Dimensionen an.' : 'Erstelle Aktivitäten.'}</div></div>
-            : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} onEditAct={act => { setEditingAct(act); setShowActForm(true); }} hiddenItems={hiddenItems} />}
+            : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} onEditAct={act => { setEditingAct(act); setShowActForm(true); }} onMoveLane={moveLane} hiddenItems={hiddenItems} />}
         </div>
       </div>
     </div>
