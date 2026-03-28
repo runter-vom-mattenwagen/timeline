@@ -66,9 +66,10 @@
     .btn-danger { color: var(--danger); }
     .btn-danger:hover { background: var(--accent-light); border-color: var(--danger); }
     .btn-sm { padding: 4px 10px; font-size: 12px; }
-    .btn-icon { padding: 6px 8px; }
-    .btn-ghost { border: none; background: none; padding: 4px 6px; }
-    .btn-ghost:hover { background: var(--bg-hover); }
+    .btn-icon { padding: 4px 8px; }
+    .btn-ghost { border: 1px solid transparent; background: none; padding: 4px 6px; color: var(--text-secondary); font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer; border-radius: var(--radius); transition: all 0.15s; white-space: nowrap; }
+    .btn-ghost:hover { background: var(--bg-hover); border-color: var(--border); color: var(--text); }
+    .toolbar-label { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
     /* Inputs */
     .input, .select { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font); font-size: 13px; color: var(--text); background: var(--bg-card); outline: none; transition: border-color 0.15s; }
@@ -172,7 +173,7 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
 
 // ── Colors ──────────────────────────────────────────────────────────────────
 const COLOR_POOL = [
@@ -363,7 +364,7 @@ function ExportDropdown({ onSVG, onPNG, onJSONCurrent, onJSONAll, onICS, onImpor
   useEffect(() => { if (!open) return; const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, [open]);
   const act = fn => { fn(); setOpen(false); };
   return (<div className="dropdown-wrap" ref={ref}>
-    <button className="btn btn-sm" onClick={() => setOpen(!open)}>⇅ ▾</button>
+    <button className="btn btn-sm" onClick={() => setOpen(!open)} title="Export / Import">⇅ ▾</button>
     {open && <div className="dropdown-menu">
       <div className="dropdown-item" onClick={() => act(onSVG)}><span className="dd-icon">⤓</span>SVG<span className="dd-hint">aktuelle Ansicht</span></div>
       <div className="dropdown-item" onClick={() => act(onPNG)}><span className="dd-icon">⤓</span>PNG<span className="dd-hint">aktuelle Ansicht</span></div>
@@ -753,11 +754,11 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
   return (
     <div style={{ overflowY: 'auto', height: '100%' }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '16px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 12 }}>
-          <button className="btn btn-sm" onClick={() => copyTo('md', buildMarkdown())}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginBottom: 12 }}>
+          <button className="btn-ghost btn-sm" onClick={() => copyTo('md', buildMarkdown())}>
             {copiedKey === 'md' ? '✓ Kopiert' : '⎘ Markdown'}
           </button>
-          <button className="btn btn-sm" onClick={() => copyTo('todo', buildTodoList(allLanes))}>
+          <button className="btn-ghost btn-sm" onClick={() => copyTo('todo', buildTodoList(allLanes))}>
             {copiedKey === 'todo' ? '✓ Kopiert' : '⎘ Todo-Liste'}
           </button>
         </div>
@@ -1013,17 +1014,17 @@ function App() {
       <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }}></div>
       <select className="select" value={activeProjectId} onChange={e => setActiveProjectId(e.target.value)} style={{ maxWidth: 200 }}>
         {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-      <button className="btn btn-sm" onClick={() => { setEditingProj(false); setShowProjForm(true); }} title="Neues Projekt">＋</button>
-      <button className="btn btn-sm" onClick={() => { setEditingProj(true); setShowProjForm(true); }} title="Umbenennen">✎</button>
-      {projects.length > 1 && <button className="btn btn-sm btn-danger" onClick={() => { if (confirm(`"${project.name}" löschen?`)) deleteProject(project.id); }}>✕</button>}
+      <button className="btn-ghost btn-sm" onClick={() => { setEditingProj(false); setShowProjForm(true); }} title="Neues Projekt">＋</button>
+      <button className="btn-ghost btn-sm" onClick={() => { setEditingProj(true); setShowProjForm(true); }} title="Umbenennen">✎</button>
+      {projects.length > 1 && <button className="btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => { if (confirm(`"${project.name}" löschen?`)) deleteProject(project.id); }} title="Projekt löschen">✕</button>}
       <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }}></div>
       {dims.length > 0 && <>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Lanes:</span>
-        <select className="select" value={groupByDimId} onChange={e => { setGroupByDimId(e.target.value); if (e.target.value === colorByDimId) { const o = dims.find(d => d.id !== e.target.value); if (o) setColorByDimId(o.id); } }} style={{ width: 130 }}>
+        <span className="toolbar-label">Lanes</span>
+        <select className="select" title="Gruppierung (Lanes)" value={groupByDimId} onChange={e => { setGroupByDimId(e.target.value); if (e.target.value === colorByDimId) { const o = dims.find(d => d.id !== e.target.value); if (o) setColorByDimId(o.id); } }} style={{ width: 130 }}>
           {dims.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
         {dims.length > 1 && <>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Farbe:</span>
-          <select className="select" value={colorByDimId} onChange={e => { setColorByDimId(e.target.value); setHiddenItems(new Set()); }} style={{ width: 130 }}>
+          <span className="toolbar-label">Farbe</span>
+          <select className="select" title="Farbgebung" value={colorByDimId} onChange={e => { setColorByDimId(e.target.value); setHiddenItems(new Set()); }} style={{ width: 130 }}>
             {dims.filter(d => d.id !== groupByDimId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
         </>}
       </>}

@@ -31,15 +31,18 @@ Same data, different perspectives. See who does what when, or which service move
 - **Dynamic Dimensions** — Create, rename, delete any number of dimensions
 - **Multi-Project** — Switch between independent timelines
 - **Calendar Weeks** — ISO week numbers in the header
-- **Milestones** — Vertical red marker lines with labels
+- **Milestones** — Vertical red marker lines with labels; click to jump in timeline
 - **Dark / Light Mode** — Follows `prefers-color-scheme`, exports always light
 - **Sticky Lane Labels** — Row names stay visible while scrolling horizontally
-- **Fixed Legend Bar** — Color legend stays visible while scrolling
+- **Fixed Legend Bar** — Click legend chips to filter activities by value
 - **Undo / Redo** — Ctrl+Z / Ctrl+Shift+Z with 50-step history
 - **Clone Activities** — Duplicate and modify in one step
 - **Date Validation** — End date can never precede start date
 - **Collapsible Sidebar** — Sections remember their open/closed state
-- **Export** — SVG (vector), PNG (2× retina), JSON (single project or all)
+- **Panning** — Drag the timeline area horizontally to scroll
+- **Activity Notes** — Freetext note per activity, shown as tooltip on the bar
+- **List View** — Tabular view with Markdown and todo-list export
+- **Export** — SVG (vector), PNG (2× retina), JSON (single or all), ICS (calendar)
 - **Import** — Merge into existing projects or replace all, with preview
 - **Zero Backend** — Everything in `localStorage`, single HTML file
 
