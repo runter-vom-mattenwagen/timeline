@@ -126,6 +126,13 @@
     .ms-item .ms-del { cursor: pointer; opacity: 0.4; margin-left: auto; font-size: 14px; }
     .ms-item .ms-del:hover { opacity: 1; color: var(--danger); }
 
+    /* View toggle (segmented control) */
+    .view-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .view-toggle button { border: none; border-radius: 0; background: var(--bg-card); color: var(--text); padding: 4px 9px; font-size: 14px; cursor: pointer; transition: background 0.15s, color 0.15s; line-height: 1; }
+    .view-toggle button + button { border-left: 1px solid var(--border); }
+    .view-toggle button:hover { background: var(--bg-hover); }
+    .view-toggle button.active { background: var(--accent); color: #fff; }
+
     /* Dropdown */
     .dropdown-wrap { position: relative; }
     .dropdown-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); min-width: 200px; z-index: 50; padding: 4px 0; animation: dropIn 0.12s ease; }
@@ -658,6 +665,181 @@ function Legend({ project, colorByDimId, hiddenItems, onToggleItem }) {
   </div>);
 }
 
+// ── List View ───────────────────────────────────────────────────────────────
+function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET, onEditAct }) {
+  const groupDim = project.dimensions.find(d => d.id === groupByDimId);
+  const colorDim = project.dimensions.find(d => d.id === colorByDimId);
+  const colorDimIdx = project.dimensions.findIndex(d => d.id === colorByDimId);
+
+  const isVisible = a => {
+    if (!hiddenItems.size) return true;
+    const refs = a.assignments[colorByDimId] || [];
+    return !refs.length || refs.some(id => !hiddenItems.has(id));
+  };
+
+  function barColor(act) {
+    if (!colorDim) return '#868e96';
+    const refs = act.assignments[colorByDimId] || [];
+    if (!refs.length) return '#868e96';
+    const activeRef = refs.find(id => !hiddenItems.has(id)) ?? refs[0];
+    const idx = colorDim.items.findIndex(c => c.id === activeRef);
+    return idx >= 0 ? getColor(colorDimIdx, idx) : '#868e96';
+  }
+
+  const allLanes = (groupDim ? groupDim.items : []).map(item => ({
+    item,
+    activities: project.activities.filter(a => isVisible(a) && (a.assignments[groupByDimId] || []).includes(item.id))
+      .sort((a, b) => a.startDate.localeCompare(b.startDate)),
+  })).filter(l => l.activities.length > 0);
+
+  const unassigned = project.activities.filter(a => isVisible(a) && !(a.assignments[groupByDimId] || []).length)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  if (unassigned.length) allLanes.push({ item: { id: '_none', name: '(nicht zugeordnet)' }, activities: unassigned });
+
+  const milestones = [...(project.milestones || [])].sort((a, b) => a.date.localeCompare(b.date));
+
+  const [copiedKey, setCopiedKey] = useState(null);
+  const copyTo = (key, text) => { navigator.clipboard.writeText(text).then(() => { setCopiedKey(key); setTimeout(() => setCopiedKey(null), 2000); }); };
+
+  function buildMarkdown() {
+    const lines = [`# ${project.name}`, ''];
+    allLanes.forEach(lane => {
+      lines.push(`## ${lane.item.name} (${lane.activities.length})`, '');
+      const otherDims = project.dimensions.filter(d => d.id !== groupByDimId);
+      const dimHeaders = otherDims.map(d => d.name);
+      const sep = (cols) => '| ' + cols.map(c => '---').join(' | ') + ' |';
+      const headers = ['Aktivität', 'Start', 'Ende', 'Dauer', ...dimHeaders];
+      lines.push('| ' + headers.join(' | ') + ' |');
+      lines.push(sep(headers));
+      lane.activities.forEach(act => {
+        const dur = daysBetween(act.startDate, act.endDate) + 1;
+        const dimCells = otherDims.map(dim => {
+          const refs = act.assignments[dim.id] || [];
+          return refs.map(id => dim.items.find(x => x.id === id)?.name).filter(Boolean).join(', ');
+        });
+        const nameCell = act.note ? `**${act.name}** *(${act.note.replace(/\n/g, ' ')})*` : `**${act.name}**`;
+        lines.push('| ' + [nameCell, act.startDate, act.endDate, dur + 'd', ...dimCells].join(' | ') + ' |');
+      });
+      lines.push('');
+    });
+    if (milestones.length) {
+      lines.push('## Meilensteine', '');
+      lines.push('| Meilenstein | Datum |');
+      lines.push('| --- | --- |');
+      milestones.forEach(ms => lines.push(`| ⚑ ${ms.label} | ${ms.date} |`));
+      lines.push('');
+    }
+    return lines.join('\n');
+  }
+
+  function buildTodoList(lanes) {
+    const lines = [];
+    lanes.forEach((lane, i) => {
+      if (lanes.length > 1) { if (i > 0) lines.push(''); lines.push(lane.item.name); }
+      lane.activities.forEach(act => {
+        const dur = daysBetween(act.startDate, act.endDate) + 1;
+        lines.push(`- [ ] ${act.name} (${act.startDate} – ${act.endDate}, ${dur}d)`);
+      });
+    });
+    return lines.join('\n');
+  }
+
+  if (!allLanes.length && !milestones.length) return (
+    <div className="empty-state">
+      <div style={{ fontSize: 14, fontWeight: 500 }}>Keine sichtbaren Aktivitäten</div>
+    </div>
+  );
+
+  return (
+    <div style={{ overflowY: 'auto', height: '100%' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '16px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 12 }}>
+          <button className="btn btn-sm" onClick={() => copyTo('md', buildMarkdown())}>
+            {copiedKey === 'md' ? '✓ Kopiert' : '⎘ Markdown'}
+          </button>
+          <button className="btn btn-sm" onClick={() => copyTo('todo', buildTodoList(allLanes))}>
+            {copiedKey === 'todo' ? '✓ Kopiert' : '⎘ Todo-Liste'}
+          </button>
+        </div>
+        {(() => {
+          const otherDims = project.dimensions.filter(d => d.id !== groupByDimId);
+          const colCount = 5 + otherDims.length;
+          const tdBase = { padding: '7px 10px', borderBottom: '1px solid var(--border-light)', fontSize: 13, verticalAlign: 'middle' };
+          const thBase = { padding: '5px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textAlign: 'left', borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap' };
+          const laneHd = (idx) => ({ padding: `${idx > 0 ? 18 : 10}px 10px 4px`, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', ...(idx > 0 ? { borderTop: '2px solid var(--border)' } : {}) });
+          return (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ ...thBase, width: 16 }}></th>
+                  <th style={{ ...thBase }}>Aktivität</th>
+                  <th style={{ ...thBase }}>Start</th>
+                  <th style={{ ...thBase }}>Ende</th>
+                  <th style={{ ...thBase, textAlign: 'right' }}>Dauer</th>
+                  {otherDims.map(d => <th key={d.id} style={{ ...thBase }}>{d.name}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {allLanes.map((lane, laneIdx) => (<React.Fragment key={lane.item.id}>
+                  <tr>
+                    <td colSpan={colCount} style={{ ...laneHd(laneIdx) }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>{lane.item.name} <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>({lane.activities.length})</span></span>
+                        <button className="btn btn-sm" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, opacity: 0.75 }}
+                          onClick={e => { e.stopPropagation(); copyTo('lane-' + lane.item.id, buildTodoList([lane])); }}
+                          title="Diese Lane als Todo-Liste kopieren">
+                          {copiedKey === 'lane-' + lane.item.id ? '✓ Kopiert' : '⎘'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {lane.activities.map(act => {
+                    const dur = daysBetween(act.startDate, act.endDate) + 1;
+                    const col = barColor(act);
+                    return (
+                      <tr key={act.id} onClick={() => onEditAct?.(act)} style={{ cursor: 'pointer' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = ''}>
+                        <td style={{ ...tdBase, width: 16, paddingRight: 0 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: 2, background: col }}></div>
+                        </td>
+                        <td style={{ ...tdBase }}>
+                          <div style={{ fontWeight: 500 }} title={act.note || undefined}>{act.name}{act.note && <span style={{ marginLeft: 5, opacity: 0.4, fontSize: 11 }}>✎</span>}</div>
+                        </td>
+                        <td style={{ ...tdBase, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{act.startDate}</td>
+                        <td style={{ ...tdBase, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{act.endDate}</td>
+                        <td style={{ ...tdBase, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', whiteSpace: 'nowrap' }}>{dur}d</td>
+                        {otherDims.map(dim => {
+                          const refs = act.assignments[dim.id] || [];
+                          const names = refs.map(id => dim.items.find(x => x.id === id)?.name).filter(Boolean);
+                          return <td key={dim.id} style={{ ...tdBase }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                              {names.map((n, i) => <span key={i} style={{ fontSize: 11, padding: '1px 6px', borderRadius: 10, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{n}</span>)}
+                            </div>
+                          </td>;
+                        })}
+                      </tr>
+                    );
+                  })}
+                </React.Fragment>))}
+                {milestones.length > 0 && <React.Fragment>
+                  <tr><td colSpan={colCount} style={{ ...laneHd(allLanes.length) }}>Meilensteine ({milestones.length})</td></tr>
+                  {milestones.map(ms => <tr key={ms.id}>
+                    <td style={{ ...tdBase, paddingRight: 0 }}><div className="ms-line" style={{ margin: 0 }}></div></td>
+                    <td style={{ ...tdBase, fontWeight: 500 }}>{ms.label}</td>
+                    <td colSpan={3} style={{ ...tdBase, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>{ms.date}</td>
+                    {otherDims.map(d => <td key={d.id} style={{ ...tdBase }}></td>)}
+                  </tr>)}
+                </React.Fragment>}
+              </tbody>
+            </table>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
 // ── App ─────────────────────────────────────────────────────────────────────
 function App() {
   const initial = migrateData(loadData()) || getDefaultState();
@@ -673,6 +855,7 @@ function App() {
   const [showProjForm, setShowProjForm] = useState(false);
   const [editingProj, setEditingProj] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [viewMode, setViewMode] = useState('timeline');
   const [importData, setImportData] = useState(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -850,10 +1033,17 @@ function App() {
       <button className="btn btn-sm btn-icon" onClick={doUndo} disabled={!canUndo} style={{ opacity: canUndo ? 1 : 0.3 }} title="Rückgängig (Ctrl+Z)">↩</button>
       <button className="btn btn-sm btn-icon" onClick={doRedo} disabled={!canRedo} style={{ opacity: canRedo ? 1 : 0.3 }} title="Wiederholen (Ctrl+Shift+Z)">↪</button>
       <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 2px' }}></div>
-      <button className="btn btn-sm btn-icon" onClick={zoomOut} title="Verkleinern">−</button>
-      <button className="btn btn-sm btn-icon" onClick={zoomFit} title="Einpassen">⊞</button>
-      <button className="btn btn-sm btn-icon" onClick={zoomIn} title="Vergrößern">+</button>
-      <button className="btn btn-sm" onClick={scrollToday}>Heute</button>
+      {viewMode === 'timeline' && <>
+        <button className="btn btn-sm btn-icon" onClick={zoomOut} title="Verkleinern">−</button>
+        <button className="btn btn-sm btn-icon" onClick={zoomFit} title="Einpassen">⊞</button>
+        <button className="btn btn-sm btn-icon" onClick={zoomIn} title="Vergrößern">+</button>
+        <button className="btn btn-sm" onClick={scrollToday}>Heute</button>
+        <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 2px' }}></div>
+      </>}
+      <div className="view-toggle" title="Ansicht wechseln">
+        <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="Timeline-Ansicht">▦</button>
+        <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')} title="Listen-Ansicht">☰</button>
+      </div>
       <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 2px' }}></div>
       <ExportDropdown onSVG={doExportSVG} onPNG={doExportPNG} onJSONCurrent={expJSONCurrent} onJSONAll={expJSONAll} onICS={doExportICS} onImport={() => fileInputRef.current?.click()} />
       <input ref={fileInputRef} type="file" accept=".json" onChange={impJSON} style={{ display: 'none' }} />
@@ -894,12 +1084,14 @@ function App() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-card)' }}>
         {hasData && dims.length > 1 && <div style={{ padding: '4px 16px', borderBottom: '1px solid var(--border-light)', flexShrink: 0, background: 'var(--bg-card)', zIndex: 3 }}>
           <Legend project={project} colorByDimId={colorByDimId} hiddenItems={hiddenItems} onToggleItem={toggleHiddenItem} /></div>}
-        <div style={{ flex: 1, overflow: 'auto', cursor: 'grab' }} ref={timelineRef}
-          onMouseDown={onPanStart} onMouseMove={onPanMove} onMouseUp={onPanEnd} onMouseLeave={onPanEnd} onClickCapture={onPanClickCapture}>
+        <div style={{ flex: 1, overflow: 'auto', ...(viewMode === 'timeline' ? { cursor: 'grab' } : {}) }} ref={timelineRef}
+          onMouseDown={viewMode === 'timeline' ? onPanStart : undefined} onMouseMove={viewMode === 'timeline' ? onPanMove : undefined} onMouseUp={viewMode === 'timeline' ? onPanEnd : undefined} onMouseLeave={viewMode === 'timeline' ? onPanEnd : undefined} onClickCapture={viewMode === 'timeline' ? onPanClickCapture : undefined}>
           {!hasData || !dims.length
             ? <div className="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>Noch keine Timeline-Daten</div><div style={{ fontSize: 13 }}>{!dims.length ? 'Lege links Dimensionen an.' : 'Erstelle Aktivitäten.'}</div></div>
-            : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} onEditAct={act => { setEditingAct(act); setShowActForm(true); }} onMoveLane={moveLane} hiddenItems={hiddenItems} />}
+            : viewMode === 'list'
+              ? <ListView project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} hiddenItems={hiddenItems} onEditAct={act => { setEditingAct(act); setShowActForm(true); }} />
+              : <TimelineSVG project={project} groupByDimId={groupByDimId} colorByDimId={colorByDimId} dayWidth={dayWidth} startDate={startDate} totalDays={totalDays} svgRef={null} forExport={false} onEditAct={act => { setEditingAct(act); setShowActForm(true); }} onMoveLane={moveLane} hiddenItems={hiddenItems} />}
         </div>
       </div>
     </div>
