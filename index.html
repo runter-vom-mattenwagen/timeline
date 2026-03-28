@@ -16,8 +16,8 @@
       --bg: #f8f9fb;
       --bg-card: #ffffff;
       --bg-hover: #f1f3f7;
-      --border: #e2e5ea;
-      --border-light: #eef0f4;
+      --border: #dde2ec;
+      --border-light: #eaecf2;
       --text: #1a1d23;
       --text-secondary: #5f6470;
       --text-muted: #8b8f9a;
@@ -40,7 +40,7 @@
     @media (prefers-color-scheme: dark) {
       :root {
         --bg: #0e1014; --bg-card: #181b22; --bg-hover: #22262f;
-        --border: #2a2f3d; --border-light: #1f2330;
+        --border: #272c3c; --border-light: #1d2130;
         --text: #e4e6eb; --text-secondary: #9ca0ab; --text-muted: #6b7080;
         --accent: #5b7bf5; --accent-hover: #7b95ff; --accent-light: #1e2540;
         --danger: #ff6b6b;
@@ -52,7 +52,7 @@
       }
     }
 
-    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; overflow: hidden; height: 100vh; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; overflow: hidden; height: 100vh; text-rendering: optimizeLegibility; font-feature-settings: 'kern' 1, 'liga' 1; -webkit-font-smoothing: antialiased; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -78,7 +78,7 @@
     /* Modal */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px); }
     .modal { background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); width: 560px; max-height: 85vh; overflow-y: auto; padding: 24px; }
-    .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+    .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; letter-spacing: -0.02em; }
     .modal label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
     .modal .field { margin-bottom: 14px; }
     .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light); }
@@ -806,8 +806,8 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
                         <td style={{ ...tdBase }}>
                           <div style={{ fontWeight: 500 }} title={act.note || undefined}>{act.name}{act.note && <span style={{ marginLeft: 5, opacity: 0.4, fontSize: 11 }}>✎</span>}</div>
                         </td>
-                        <td style={{ ...tdBase, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{act.startDate}</td>
-                        <td style={{ ...tdBase, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{act.endDate}</td>
+                        <td style={{ ...tdBase, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{act.startDate}</td>
+                        <td style={{ ...tdBase, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{act.endDate}</td>
                         <td style={{ ...tdBase, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', whiteSpace: 'nowrap' }}>{dur}d</td>
                         {otherDims.map(dim => {
                           const refs = act.assignments[dim.id] || [];
