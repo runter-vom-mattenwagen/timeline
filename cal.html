@@ -17,21 +17,20 @@
       --border: #dde2ec; --border-light: #eaecf2;
       --text: #1a1d23; --text-secondary: #5f6470; --text-muted: #8b8f9a;
       --accent: #3b5bdb; --accent-hover: #2b4bc8; --accent-light: #eef1fb;
+      --accent-rgb: 59, 91, 219;
       --danger: #e03131;
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
       --radius: 6px; --font: 'DM Sans', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
       --we-bg: rgba(0,0,0,0.018);
     }
-
     @media (prefers-color-scheme: dark) {
       :root {
         --bg: #0e1014; --bg-card: #181b22; --bg-hover: #22262f;
         --border: #272c3c; --border-light: #1d2130;
         --text: #e4e6eb; --text-secondary: #9ca0ab; --text-muted: #6b7080;
         --accent: #5b7bf5; --accent-hover: #7b95ff; --accent-light: #1e2540;
+        --accent-rgb: 91, 123, 245;
         --danger: #ff6b6b;
-        --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
         --we-bg: rgba(255,255,255,0.02);
       }
     }
@@ -41,33 +40,64 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-    .toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--bg-card); position: sticky; top: 0; z-index: 10; }
+    /* Toolbar */
+    .toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--bg-card); position: sticky; top: 0; z-index: 10; flex-wrap: wrap; }
     .sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
     .select { padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font-family: var(--font); font-size: 13px; outline: none; cursor: pointer; }
     .btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.12s; white-space: nowrap; }
     .btn:hover { background: var(--bg-hover); }
-    .btn-nav { padding: 5px 10px; font-size: 16px; line-height: 1; }
+    .btn-nav { padding: 5px 11px; font-size: 17px; line-height: 1; }
     .toolbar-label { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .month-title { font-weight: 600; font-size: 15px; min-width: 170px; text-align: center; }
+    .nav-title { font-weight: 600; font-size: 15px; min-width: 120px; text-align: center; }
+    .view-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .view-toggle button { padding: 5px 12px; border: none; background: none; color: var(--text-muted); font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.12s; }
+    .view-toggle button.active { background: var(--accent-light); color: var(--accent); }
+    .view-toggle button:hover:not(.active) { background: var(--bg-hover); }
 
+    /* Calendar wrap */
     .cal-wrap { padding: 20px; }
-    .cal-grid { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-card); }
-    .day-header-row { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--bg-card); border-bottom: 2px solid var(--border); }
-    .day-header { padding: 8px 0; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
-    .day-header.weekend { color: var(--text-muted); opacity: 0.6; }
+    .cal-grid { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg-card); }
 
-    .week-row { position: relative; border-bottom: 1px solid var(--border-light); }
+    /* Day header row (month view) */
+    .day-header-row { display: flex; background: var(--bg-card); border-bottom: 2px solid var(--border); }
+    .kw-col-header { width: 38px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 10px 0 8px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; text-align: center; }
+    .day-header-cols { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); }
+    .day-header { padding: 10px 0 8px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
+    .day-header.weekend { opacity: 0.55; }
+
+    /* Month view */
+    .week-row { display: flex; border-bottom: 1px solid var(--border); }
     .week-row:last-child { border-bottom: none; }
+    .kw-week-label { width: 38px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 6px 4px 0; font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); display: flex; justify-content: center; user-select: none; }
+    .week-day-area { position: relative; flex: 1; }
     .day-cells { display: grid; grid-template-columns: repeat(7, 1fr); }
-    .day-cell { border-right: 1px solid var(--border-light); padding: 4px 6px; min-height: 26px; }
+    .day-cell { border-right: 1px solid var(--border); padding: 6px 8px; }
     .day-cell:last-child { border-right: none; }
     .day-cell.weekend { background: var(--we-bg); }
-    .day-cell.other-month { opacity: 0.35; }
-    .day-num { font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; }
-    .day-num.today { font-weight: 700; color: #e03131; background: rgba(224,49,49,0.1); border-radius: 10px; padding: 1px 5px; }
-    .milestone-dot { font-size: 10px; color: #e03131; }
+    .day-cell.other-month { opacity: 0.3; }
+    .day-cell.today-col { background: rgba(var(--accent-rgb), 0.04); }
+    .day-cell.weekend.today-col { background: rgba(var(--accent-rgb), 0.05); }
+    .day-num { font-size: 13px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; line-height: 1; }
+    .day-num.today { font-weight: 700; color: var(--danger); background: rgba(224,49,49,0.1); border-radius: 10px; padding: 2px 7px; }
+    .ms-flag { font-size: 10px; color: var(--danger); }
 
-    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 12px; color: var(--text-muted); }
+    /* Year view — month rows */
+    .year-grid { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg-card); }
+    .year-month-row { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); }
+    .year-month-row:last-child { border-bottom: none; }
+    .year-month-label { width: 48px; flex-shrink: 0; padding: 8px 8px 8px 10px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; text-align: right; border-right: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: flex-end; }
+
+    /* KW tiles */
+    .kw-tiles { display: flex; flex: 1; }
+    .kw-tile { flex: 1; min-width: 0; padding: 6px 7px 7px; overflow: hidden; border-right: 1px solid var(--border); position: relative; }
+    .kw-tile:last-child { border-right: none; }
+    .kw-tile.current-week { background: var(--accent-light); }
+    .kw-tile-num { font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); line-height: 1; margin-bottom: 5px; user-select: none; }
+    .kw-tile.current-week .kw-tile-num { color: var(--accent); font-weight: 700; }
+    .kw-tile-bars { position: relative; }
+
+    /* Empty state */
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; gap: 14px; color: var(--text-muted); }
     .empty-state a { color: var(--accent); text-decoration: none; }
     .empty-state a:hover { text-decoration: underline; }
   </style>
@@ -75,7 +105,7 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-const { useState, useMemo } = React;
+const { useState, useMemo, useRef, useEffect } = React;
 
 const COLOR_POOL = [
   '#4dabf7','#74c0fc','#a9e34b','#69db7c','#38d9a9',
@@ -85,212 +115,428 @@ const COLOR_POOL = [
   '#c0eb75','#96f2d7','#74c0fc','#91a7ff','#b197fc',
   '#f197c0','#ff8787','#f0c080',
 ];
-const MONTHS   = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-const DAYS_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So'];
-const DAY_H = 26, EVENT_H = 22, EVENT_GAP = 2;
+const MONTHS       = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const MONTHS_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const DAYS_SHORT   = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+
+// Month view sizing
+const M_DAY_H = 56, M_EVT_H = 26, M_EVT_GAP = 3;
+// Year/KW tile sizing
+const KW_BAR_H = 18, KW_BAR_GAP = 2;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const toDate     = s => { const [y,m,d] = s.split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); };
-const fmtISO     = d => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
-const fmtDE      = s => { const [y,m,d] = s.split('-'); return `${d}.${m}.${y}`; };
-const daysBetween = (a,b) => Math.round((toDate(b)-toDate(a))/864e5);
-const todayISO   = () => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; };
-const genId      = () => Math.random().toString(36).substring(2,10);
-const getColor   = (dimIdx, itemIdx) => COLOR_POOL[(dimIdx*5+itemIdx) % COLOR_POOL.length];
+const toDate       = s => { const [y,m,d] = s.split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); };
+const fmtISO       = d => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+const fmtDE        = s => { const [y,m,d] = s.split('-'); return `${d}.${m}.${y}`; };
+const fmtDEshort   = s => { const [,m,d] = s.split('-'); return `${+d}.${+m}.`; };
+const daysBetween  = (a,b) => Math.round((toDate(b)-toDate(a))/864e5);
+const addDays      = (s,n) => { const d=toDate(s); d.setUTCDate(d.getUTCDate()+n); return fmtISO(d); };
+const todayISO     = () => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; };
+const genId        = () => Math.random().toString(36).substring(2,10);
+const getColor     = (dIdx,iIdx) => COLOR_POOL[(dIdx*5+iIdx) % COLOR_POOL.length];
 const resolveNames = (act,dim) => (act.assignments[dim.id]||[]).map(id=>dim.items.find(x=>x.id===id)?.name).filter(Boolean);
+
+function getWeekStart(s) {
+  const d = toDate(s); const dow = (d.getUTCDay()+6)%7;
+  d.setUTCDate(d.getUTCDate()-dow); return fmtISO(d);
+}
+
+function getISOWeek(s) {
+  const d = toDate(s);
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));
+  const y1 = new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  return Math.ceil((((t-y1)/864e5)+1)/7);
+}
+
+function getISOWeeksOfYear(year) {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const dow  = (jan4.getUTCDay()+6)%7;
+  const kw1Start = new Date(jan4);
+  kw1Start.setUTCDate(kw1Start.getUTCDate()-dow);
+  const weekCount = getISOWeek(fmtISO(new Date(Date.UTC(year,11,28))));
+  const weeks = [];
+  for (let w=0; w<weekCount; w++) {
+    const d = new Date(kw1Start);
+    d.setUTCDate(d.getUTCDate()+w*7);
+    weeks.push(fmtISO(d));
+  }
+  return weeks;
+}
+
+// KW belongs to month of its Thursday (ISO convention)
+function getKWMonth(weekStart) {
+  return toDate(addDays(weekStart,3)).getUTCMonth();
+}
+
+function groupWeeksByMonth(weekStarts) {
+  const groups = {}, order = [];
+  weekStarts.forEach(ws => {
+    const m = getKWMonth(ws);
+    if (!groups[m]) { groups[m]=[]; order.push(m); }
+    groups[m].push(ws);
+  });
+  return order.map(m => ({ month:m, weeks:groups[m] }));
+}
+
+// Compute a stable row assignment for all activities (greedy, by start date).
+// Activities that don't temporally overlap share rows; result is used by all
+// KW tiles so the same activity always appears at the same vertical position.
+function computeYearRows(activities) {
+  const sorted = [...activities].sort((a,b) => a.startDate.localeCompare(b.startDate));
+  const rowMap = {}, rowEnd = [];
+  sorted.forEach(act => {
+    let r = rowEnd.findIndex(end => act.startDate > end);
+    if (r === -1) r = rowEnd.length;
+    rowMap[act.id] = r;
+    rowEnd[r] = act.endDate;
+  });
+  return { rowMap, maxRows: rowEnd.length };
+}
 
 // ── Migration v1 → v2 ────────────────────────────────────────────────────────
 const V1_DIM = { person:'Personen', service:'Services', stage:'Stages', strand:'Stränge' };
 const V1_KEY = { person:'persons', service:'services', stage:'stages', strand:'strands' };
 
 function migrateProject(p) {
-  if (Array.isArray(p.dimensions)) { p.milestones = p.milestones||[]; return p; }
-  const oldDims = p.dimensions||{}, newDims=[], idMap={};
+  if (Array.isArray(p.dimensions)) { p.milestones=p.milestones||[]; return p; }
+  const oldDims=p.dimensions||{}, newDims=[], idMap={};
   Object.keys(V1_DIM).forEach(k => {
-    const items = oldDims[k]||[];
-    if (items.length) { const id=genId(); idMap[k]=id; newDims.push({id, name:V1_DIM[k], items:items.map(it=>({...it}))}); }
+    const items=oldDims[k]||[];
+    if (items.length) { const id=genId(); idMap[k]=id; newDims.push({id,name:V1_DIM[k],items:items.map(it=>({...it}))}); }
   });
-  const activities = (p.activities||[]).map(act => {
+  const activities=(p.activities||[]).map(act => {
     const assignments={};
     Object.keys(V1_KEY).forEach(k => { const refs=act[V1_KEY[k]]||[]; if (refs.length&&idMap[k]) assignments[idMap[k]]=[...refs]; });
-    const {persons,services,stages,strands,...rest} = act;
-    return {...rest, assignments};
+    const {persons,services,stages,strands,...rest}=act;
+    return {...rest,assignments};
   });
-  return {...p, dimensions:newDims, activities, milestones:p.milestones||[]};
+  return {...p,dimensions:newDims,activities,milestones:p.milestones||[]};
 }
 
 function loadProjects() {
   try {
-    const raw = localStorage.getItem('timeline-viz-data');
+    const raw=localStorage.getItem('timeline-viz-data');
     if (!raw) return [];
-    const data = JSON.parse(raw);
-    const list = data?.projects || (Array.isArray(data) ? data : [data]);
+    const data=JSON.parse(raw);
+    const list=data?.projects||(Array.isArray(data)?data:[data]);
     return list.map(migrateProject).filter(Boolean);
   } catch { return []; }
 }
 
-// ── Calendar logic ───────────────────────────────────────────────────────────
-function getMonthWeeks(year, month) {
-  const first = new Date(Date.UTC(year, month, 1));
-  const dow = (first.getUTCDay()+6)%7; // 0=Mo
-  const start = new Date(first);
-  start.setUTCDate(start.getUTCDate()-dow);
-  const weeks = [];
-  let cur = start;
-  while (true) {
-    const week = [];
-    for (let i=0; i<7; i++) { week.push(fmtISO(cur)); cur=new Date(cur); cur.setUTCDate(cur.getUTCDate()+1); }
-    weeks.push(week);
-    if (toDate(week[6]) >= new Date(Date.UTC(year,month+1,0))) break;
-  }
-  return weeks;
-}
-
+// ── Month view helpers ────────────────────────────────────────────────────────
 function layoutWeek(activities, weekDays, colorByDimId, project) {
   const wStart=weekDays[0], wEnd=weekDays[6];
-  const colorDim    = project.dimensions.find(d=>d.id===colorByDimId);
   const colorDimIdx = project.dimensions.findIndex(d=>d.id===colorByDimId);
+  const colorDim    = project.dimensions[colorDimIdx];
 
   const events = activities
     .filter(a => a.startDate<=wEnd && a.endDate>=wStart)
     .sort((a,b) => a.startDate.localeCompare(b.startDate))
     .map(act => {
-      const startCol = Math.max(0, daysBetween(wStart, act.startDate));
-      const endCol   = Math.min(6, daysBetween(wStart, act.endDate));
-      let color = '#868e96';
+      const startCol = Math.max(0, daysBetween(wStart,act.startDate));
+      const endCol   = Math.min(6, daysBetween(wStart,act.endDate));
+      let color='#868e96';
       if (colorDim) {
-        const refs = act.assignments[colorByDimId]||[];
-        const idx = colorDim.items.findIndex(x=>refs.includes(x.id));
-        if (idx>=0) color = getColor(colorDimIdx, idx);
+        const refs=act.assignments[colorByDimId]||[];
+        const idx=colorDim.items.findIndex(x=>refs.includes(x.id));
+        if (idx>=0) color=getColor(colorDimIdx,idx);
       }
-      return { act, startCol, span: endCol-startCol+1, color,
-               continuesLeft: act.startDate<wStart,
-               continuesRight: act.endDate>wEnd, row: 0 };
+      return { act, startCol, span:endCol-startCol+1, color,
+               continuesLeft:act.startDate<wStart, continuesRight:act.endDate>wEnd, row:0 };
     });
 
-  // greedy row stacking
-  const rows = [];
+  const rows=[];
   events.forEach(ev => {
     let placed=false;
-    for (let r=0; r<rows.length; r++) {
-      if (ev.startCol >= rows[r][rows[r].length-1].startCol + rows[r][rows[r].length-1].span) {
+    for (let r=0;r<rows.length;r++) {
+      if (ev.startCol>=rows[r][rows[r].length-1].startCol+rows[r][rows[r].length-1].span) {
         rows[r].push(ev); ev.row=r; placed=true; break;
       }
     }
     if (!placed) { rows.push([ev]); ev.row=rows.length-1; }
   });
-
-  return { events, rowCount: rows.length };
+  return { events, rowCount:rows.length };
 }
 
-// ── Components ───────────────────────────────────────────────────────────────
-function WeekRow({ weekDays, activities, milestones, colorByDimId, project, currentMonth, today }) {
+function getMonthWeeks(year, month) {
+  const first=new Date(Date.UTC(year,month,1));
+  const dow=(first.getUTCDay()+6)%7;
+  const start=new Date(first); start.setUTCDate(start.getUTCDate()-dow);
+  const weeks=[]; let cur=start;
+  while (true) {
+    const week=[];
+    for (let i=0;i<7;i++) { week.push(fmtISO(cur)); cur=new Date(cur); cur.setUTCDate(cur.getUTCDate()+1); }
+    weeks.push(week);
+    const lastDay = toDate(week[6]);
+    // Break only once we've passed the last day of the month AND the last
+    // week already contains at least one day from the next month (Sunday ∉ current month).
+    if (lastDay >= new Date(Date.UTC(year,month+1,0)) && lastDay.getUTCMonth() !== month) break;
+  }
+  return weeks;
+}
+
+// ── Month event bar ───────────────────────────────────────────────────────────
+function EventBar({ ev, evtH, evtTop, project }) {
+  const left  = ev.startCol/7*100;
+  const width = ev.span/7*100;
+  const rL=ev.continuesLeft?0:6, rR=ev.continuesRight?0:6;
+  const names = project.dimensions.flatMap(dim=>resolveNames(ev.act,dim));
+  const tooltip=[ev.act.name,`${fmtDE(ev.act.startDate)} – ${fmtDE(ev.act.endDate)}`,...names,ev.act.note||''].filter(Boolean).join('\n');
+  return (
+    <div title={tooltip} style={{
+      position:'absolute',
+      left:`calc(${left}% + ${ev.continuesLeft?0:3}px)`,
+      width:`calc(${width}% - ${(ev.continuesLeft?0:3)+(ev.continuesRight?0:3)}px)`,
+      top:evtTop, height:evtH-2,
+      background:ev.color,
+      borderRadius:`${rL}px ${rR}px ${rR}px ${rL}px`,
+      color:'#fff', fontSize:11, fontWeight:500,
+      padding:'0 8px', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
+      cursor:'default', zIndex:1, opacity:0.92,
+      boxShadow:'0 1px 3px rgba(0,0,0,0.18)',
+      display:'flex', alignItems:'center',
+    }}>
+      {!ev.continuesLeft && <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{ev.act.name}</span>}
+    </div>
+  );
+}
+
+// ── Month view ────────────────────────────────────────────────────────────────
+function MonthWeekRow({ weekDays, activities, milestones, colorByDimId, project, currentMonth, today, todayColIdx }) {
   const { events, rowCount } = useMemo(
     () => layoutWeek(activities, weekDays, colorByDimId, project),
     [activities, weekDays, colorByDimId]
   );
-  const totalH = DAY_H + rowCount*(EVENT_H+EVENT_GAP) + (rowCount>0?6:0);
+  const totalH = M_DAY_H + rowCount*(M_EVT_H+M_EVT_GAP) + (rowCount>0?10:4);
+  const kw = getISOWeek(weekDays[0]);
 
   return (
-    <div className="week-row" style={{ minHeight: totalH }}>
-      <div className="day-cells">
-        {weekDays.map((ds,i) => {
-          const d = toDate(ds);
-          const isCurrentMonth = d.getUTCMonth()===currentMonth;
-          const isToday = ds===today;
-          const hasMilestone = milestones.some(m=>m.date===ds);
-          return (
-            <div key={ds} className={`day-cell${i>=5?' weekend':''}${!isCurrentMonth?' other-month':''}`}>
-              <span className={`day-num${isToday?' today':''}`}>
-                {d.getUTCDate()}
-                {hasMilestone && <span className="milestone-dot">⚑</span>}
-              </span>
-            </div>
-          );
-        })}
+    <div className="week-row">
+      <div className="kw-week-label">{kw}</div>
+      <div className="week-day-area" style={{minHeight:totalH}}>
+        <div className="day-cells">
+          {weekDays.map((ds,i) => {
+            const d=toDate(ds);
+            const isCurrentMonth=d.getUTCMonth()===currentMonth;
+            const isToday=ds===today;
+            const hasMilestone=milestones.some(m=>m.date===ds);
+            const isTodayCol=i===todayColIdx;
+            let cls='day-cell';
+            if (i>=5) cls+=' weekend';
+            if (!isCurrentMonth) cls+=' other-month';
+            if (isTodayCol) cls+=' today-col';
+            return (
+              <div key={ds} className={cls} style={{minHeight:M_DAY_H}}>
+                <span className={`day-num${isToday?' today':''}`}>
+                  {d.getUTCDate()}
+                  {hasMilestone && <span className="ms-flag">⚑</span>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {events.map(ev => (
+          <EventBar key={ev.act.id+ev.startCol} ev={ev} project={project}
+            evtH={M_EVT_H} evtTop={M_DAY_H+ev.row*(M_EVT_H+M_EVT_GAP)}/>
+        ))}
       </div>
-      {events.map(ev => {
-        const left  = ev.startCol/7*100;
-        const width = ev.span/7*100;
-        const top   = DAY_H + ev.row*(EVENT_H+EVENT_GAP);
-        const rL = ev.continuesLeft  ? 0 : 5;
-        const rR = ev.continuesRight ? 0 : 5;
-        const names = ev.act.assignments && project.dimensions.length
-          ? project.dimensions.flatMap(dim => resolveNames(ev.act, dim))
-          : [];
-        const tooltip = [ev.act.name, `${fmtDE(ev.act.startDate)} – ${fmtDE(ev.act.endDate)}`, ...names, ev.act.note||''].filter(Boolean).join('\n');
-        return (
-          <div key={ev.act.id+ev.startCol} title={tooltip} style={{
-            position: 'absolute',
-            left:  `calc(${left}%  + ${ev.continuesLeft  ? 0 : 2}px)`,
-            width: `calc(${width}% - ${(ev.continuesLeft?0:2)+(ev.continuesRight?0:2)}px)`,
-            top, height: EVENT_H-2,
-            background: ev.color,
-            borderRadius: `${rL}px ${rR}px ${rR}px ${rL}px`,
-            color: '#fff', fontSize: 11, fontWeight: 500,
-            padding: '3px 7px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-            cursor: 'default', zIndex: 1, opacity: 0.92,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
-          }}>
-            {!ev.continuesLeft && ev.act.name}
-          </div>
-        );
-      })}
     </div>
   );
 }
 
 function MonthView({ project, colorByDimId, year, month }) {
-  const today = todayISO();
-  const weeks = useMemo(() => getMonthWeeks(year, month), [year, month]);
+  const today=todayISO();
+  const todayColIdx=(toDate(today).getUTCDay()+6)%7;
+  const weeks=useMemo(()=>getMonthWeeks(year,month),[year,month]);
   return (
     <div className="cal-grid">
       <div className="day-header-row">
-        {DAYS_SHORT.map((d,i) => <div key={d} className={`day-header${i>=5?' weekend':''}`}>{d}</div>)}
+        <div className="kw-col-header">KW</div>
+        <div className="day-header-cols">
+          {DAYS_SHORT.map((d,i)=><div key={d} className={`day-header${i>=5?' weekend':''}${i===todayColIdx?' today-col':''}`}>{d}</div>)}
+        </div>
       </div>
-      {weeks.map(w => (
-        <WeekRow key={w[0]} weekDays={w} activities={project.activities} milestones={project.milestones||[]}
-          colorByDimId={colorByDimId} project={project} currentMonth={month} today={today} />
+      {weeks.map(w=>(
+        <MonthWeekRow key={w[0]} weekDays={w} activities={project.activities}
+          milestones={project.milestones||[]} colorByDimId={colorByDimId}
+          project={project} currentMonth={month} today={today} todayColIdx={todayColIdx}/>
       ))}
     </div>
   );
 }
 
+// ── Year view — KW tile grid ──────────────────────────────────────────────────
+function KWTile({ weekStart, project, colorByDimId, today, tileRef, rowMap, tileH, maxRows }) {
+  const weekEnd       = addDays(weekStart, 6);
+  const kw            = getISOWeek(weekStart);
+  const isCurrentWeek = weekStart === getWeekStart(today);
+  const colorDimIdx   = project.dimensions.findIndex(d=>d.id===colorByDimId);
+  const colorDim      = project.dimensions[colorDimIdx];
+  const milestones    = project.milestones||[];
+
+  const bars = useMemo(() => {
+    return project.activities
+      .filter(a => a.startDate<=weekEnd && a.endDate>=weekStart)
+      .map(act => {
+        const clampedStart = act.startDate < weekStart ? weekStart : act.startDate;
+        const clampedEnd   = act.endDate   > weekEnd   ? weekEnd   : act.endDate;
+        const offsetDays   = daysBetween(weekStart, clampedStart);
+        const spanDays     = daysBetween(clampedStart, clampedEnd) + 1;
+        const continuesL   = act.startDate < weekStart;
+        const continuesR   = act.endDate   > weekEnd;
+        let color = '#868e96';
+        if (colorDim) {
+          const refs = act.assignments[colorByDimId]||[];
+          const idx  = colorDim.items.findIndex(x=>refs.includes(x.id));
+          if (idx>=0) color = getColor(colorDimIdx, idx);
+        }
+        const names   = colorDim ? resolveNames(act, colorDim) : [];
+        const tooltip = [act.name, `${fmtDE(act.startDate)} – ${fmtDE(act.endDate)}`, ...names, act.note||''].filter(Boolean).join('\n');
+        return { act, offsetDays, spanDays, continuesL, continuesR, color, tooltip };
+      });
+  }, [project.activities, weekStart, colorByDimId]);
+
+  const weekMilestones = milestones.filter(m => m.date>=weekStart && m.date<=weekEnd);
+  const titleTip  = `KW ${kw} · ${fmtDEshort(weekStart)}–${fmtDEshort(weekEnd)}`;
+  const density   = maxRows > 0 ? bars.length / maxRows : 0;
+  const tileBg = isCurrentWeek ? 'var(--accent-light)'
+    : density > 0  ? `rgba(var(--accent-rgb),${(density*0.07).toFixed(2)})`
+    : undefined;
+
+  return (
+    <div ref={tileRef} className={`kw-tile${isCurrentWeek?' current-week':''}`}
+         title={titleTip} style={{background:tileBg}}>
+      <div className="kw-tile-num">
+        {kw}
+        {weekMilestones.map(m => (
+          <span key={m.date+m.label}
+            title={`${m.label} (${fmtDE(m.date)})`}
+            style={{color:'var(--danger)', marginLeft:3, cursor:'default'}}>⚑</span>
+        ))}
+      </div>
+      <div className="kw-tile-bars" style={{height:tileH, position:'relative', zIndex:1}}>
+        {bars.map(bar => {
+          const row = rowMap[bar.act.id] ?? 0;
+          const rL  = bar.continuesL ? 0 : 4, rR = bar.continuesR ? 0 : 4;
+          return (
+            <div key={bar.act.id} title={bar.tooltip} style={{
+              position:'absolute',
+              left:  `${bar.offsetDays/7*100}%`,
+              width: `${bar.spanDays/7*100}%`,
+              top:   row * (KW_BAR_H + KW_BAR_GAP),
+              height: KW_BAR_H,
+              background: bar.color,
+              borderRadius: `${rL}px ${rR}px ${rR}px ${rL}px`,
+              opacity: 0.9,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 5px',
+              fontSize: 10,
+              fontWeight: 500,
+              color: '#fff',
+              cursor: 'default',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+            }}>
+              {!bar.continuesL && bar.spanDays >= 2 &&
+                <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{bar.act.name}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function YearView({ project, colorByDimId, year, today, scrollTrigger }) {
+  const weekStarts = useMemo(()=>getISOWeeksOfYear(year),[year]);
+  const groups     = useMemo(()=>groupWeeksByMonth(weekStarts),[weekStarts]);
+  const todayWeek  = getWeekStart(today);
+  const curRef     = useRef(null);
+
+  // Stable global row assignment — same for every tile
+  const { rowMap, maxRows } = useMemo(
+    ()=>computeYearRows(project.activities),
+    [project.activities]
+  );
+  const tileH = Math.max(maxRows * (KW_BAR_H + KW_BAR_GAP), 4);
+
+  useEffect(()=>{
+    curRef.current?.scrollIntoView({ behavior:'smooth', block:'center' });
+  }, [year, scrollTrigger]);
+
+  return (
+    <div className="year-grid">
+      {groups.map(({ month, weeks }) => (
+        <div key={month} className="year-month-row">
+          <div className="year-month-label">{MONTHS_SHORT[month]}</div>
+          <div className="kw-tiles">
+            {weeks.map(ws => (
+              <KWTile key={ws} weekStart={ws} project={project}
+                colorByDimId={colorByDimId} today={today}
+                tileRef={ws===todayWeek ? curRef : null}
+                rowMap={rowMap} tileH={tileH} maxRows={maxRows}/>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
 function App() {
-  const projects = useMemo(() => loadProjects(), []);
-  const [projectId, setProjectId] = useState(() => projects[0]?.id||null);
-  const now = new Date();
-  const [year,  setYear]  = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth());
+  const projects=useMemo(()=>loadProjects(),[]);
+  const [projectId,setProjectId]=useState(()=>projects[0]?.id||null);
+  const now=new Date();
+  const [view,setView]=useState('month');
+  const [year,setYear]=useState(now.getFullYear());
+  const [month,setMonth]=useState(now.getMonth());
+  const [scrollTrigger,setScrollTrigger]=useState(0);
 
-  const project = projects.find(p=>p.id===projectId)||projects[0];
-  const [colorByDimId, setColorByDimId] = useState(() => project?.dimensions[0]?.id||null);
+  const project=projects.find(p=>p.id===projectId)||projects[0];
+  const [colorByDimId,setColorByDimId]=useState(()=>project?.dimensions[0]?.id||null);
 
-  const prevMonth = () => month===0 ? (setYear(y=>y-1),setMonth(11)) : setMonth(m=>m-1);
-  const nextMonth = () => month===11 ? (setYear(y=>y+1),setMonth(0))  : setMonth(m=>m+1);
-  const goToday   = () => { setYear(new Date().getFullYear()); setMonth(new Date().getMonth()); };
+  const today=todayISO();
+
+  const prevPeriod = () => {
+    if (view==='month') month===0?(setYear(y=>y-1),setMonth(11)):setMonth(m=>m-1);
+    else setYear(y=>y-1);
+  };
+  const nextPeriod = () => {
+    if (view==='month') month===11?(setYear(y=>y+1),setMonth(0)):setMonth(m=>m+1);
+    else setYear(y=>y+1);
+  };
+  const goToday = () => {
+    const n=new Date();
+    setYear(n.getFullYear());
+    if (view==='month') setMonth(n.getMonth());
+    setScrollTrigger(t=>t+1);
+  };
+
+  const navTitle = view==='month' ? `${MONTHS[month]} ${year}` : String(year);
 
   if (!projects.length) return (
     <div className="empty-state">
-      <div style={{ fontSize: 36 }}>📅</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>Keine Timeline-Daten gefunden</div>
-      <div style={{ fontSize: 13 }}>Öffne zuerst die <a href="index.html">Timeline-App</a> und lege Projekte an.</div>
+      <div style={{fontSize:40}}>📅</div>
+      <div style={{fontSize:16,fontWeight:600,color:'var(--text)'}}>Keine Timeline-Daten gefunden</div>
+      <div style={{fontSize:13}}>Öffne zuerst die <a href="index.html">Timeline-App</a> und lege Projekte an.</div>
     </div>
   );
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={{minHeight:'100vh'}}>
       <div className="toolbar">
-        {/* Logo */}
-        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5">
             <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
           </svg>
-          <span style={{ fontWeight:700, fontSize:15, color:'var(--accent)' }}>Kalender</span>
+          <span style={{fontWeight:700,fontSize:15,color:'var(--accent)'}}>Kalender</span>
         </div>
         <div className="sep"/>
 
-        {/* Project */}
         {projects.length>1 && <select className="select" value={projectId} onChange={e=>{
           setProjectId(e.target.value);
           setColorByDimId(projects.find(p=>p.id===e.target.value)?.dimensions[0]?.id||null);
@@ -298,7 +544,6 @@ function App() {
           {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
         </select>}
 
-        {/* ColorBy */}
         {project?.dimensions?.length>1 && <>
           <span className="toolbar-label">Farbe</span>
           <select className="select" value={colorByDimId||''} onChange={e=>setColorByDimId(e.target.value)}>
@@ -306,20 +551,28 @@ function App() {
           </select>
         </>}
 
-        <div style={{ flex:1 }}/>
+        <div style={{flex:1}}/>
 
-        {/* Navigation */}
         <button className="btn" onClick={goToday}>Heute</button>
-        <button className="btn btn-nav" onClick={prevMonth}>‹</button>
-        <span className="month-title">{MONTHS[month]} {year}</span>
-        <button className="btn btn-nav" onClick={nextMonth}>›</button>
+        <button className="btn btn-nav" onClick={prevPeriod}>‹</button>
+        <span className="nav-title">{navTitle}</span>
+        <button className="btn btn-nav" onClick={nextPeriod}>›</button>
 
         <div className="sep"/>
-        <a href="index.html" style={{ fontSize:12, color:'var(--text-muted)', textDecoration:'none' }}>← Timeline</a>
+
+        <div className="view-toggle">
+          <button className={view==='month'?'active':''} onClick={()=>setView('month')}>Monat</button>
+          <button className={view==='year'?'active':''} onClick={()=>{ setView('year'); setScrollTrigger(t=>t+1); }}>Jahr</button>
+        </div>
+
+        <div className="sep"/>
+        <a href="index.html" style={{fontSize:12,color:'var(--text-muted)',textDecoration:'none'}}>← Timeline</a>
       </div>
 
       {project && <div className="cal-wrap">
-        <MonthView project={project} colorByDimId={colorByDimId} year={year} month={month}/>
+        {view==='month'
+          ? <MonthView project={project} colorByDimId={colorByDimId} year={year} month={month}/>
+          : <YearView  project={project} colorByDimId={colorByDimId} year={year} today={today} scrollTrigger={scrollTrigger}/>}
       </div>}
     </div>
   );
