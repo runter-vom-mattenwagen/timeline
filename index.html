@@ -703,35 +703,26 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
   const [copiedKey, setCopiedKey] = useState(null);
   const copyTo = (key, text) => { navigator.clipboard.writeText(text).then(() => { setCopiedKey(key); setTimeout(() => setCopiedKey(null), 2000); }); };
 
-  function buildMarkdown() {
-    const lines = [`# ${project.name}`, ''];
+  function buildTSV() {
+    const otherDims = project.dimensions.filter(d => d.id !== groupByDimId);
+    const headers = ['Gruppe', 'Aktivität', 'Start', 'Ende', 'Dauer (Tage)', 'Notiz', ...otherDims.map(d => d.name)];
+    const rows = [headers];
     allLanes.forEach(lane => {
-      lines.push(`## ${lane.item.name} (${lane.activities.length})`, '');
-      const otherDims = project.dimensions.filter(d => d.id !== groupByDimId);
-      const dimHeaders = otherDims.map(d => d.name);
-      const sep = (cols) => '| ' + cols.map(c => '---').join(' | ') + ' |';
-      const headers = ['Aktivität', 'Start', 'Ende', 'Dauer', ...dimHeaders];
-      lines.push('| ' + headers.join(' | ') + ' |');
-      lines.push(sep(headers));
       lane.activities.forEach(act => {
         const dur = daysBetween(act.startDate, act.endDate) + 1;
         const dimCells = otherDims.map(dim => {
           const refs = act.assignments[dim.id] || [];
           return refs.map(id => dim.items.find(x => x.id === id)?.name).filter(Boolean).join(', ');
         });
-        const nameCell = act.note ? `**${act.name}** *(${act.note.replace(/\n/g, ' ')})*` : `**${act.name}**`;
-        lines.push('| ' + [nameCell, fmtDE(act.startDate), fmtDE(act.endDate), dur + 'd', ...dimCells].join(' | ') + ' |');
+        rows.push([lane.item.name, act.name, fmtDE(act.startDate), fmtDE(act.endDate), dur, act.note?.replace(/\n/g, ' ') || '', ...dimCells]);
       });
-      lines.push('');
     });
     if (milestones.length) {
-      lines.push('## Meilensteine', '');
-      lines.push('| Meilenstein | Datum |');
-      lines.push('| --- | --- |');
-      milestones.forEach(ms => lines.push(`| ⚑ ${ms.label} | ${fmtDE(ms.date)} |`));
-      lines.push('');
+      rows.push([]);
+      rows.push(['Meilensteine', 'Datum']);
+      milestones.forEach(ms => rows.push([ms.label, fmtDE(ms.date)]));
     }
-    return lines.join('\n');
+    return rows.map(r => r.join('\t')).join('\n');
   }
 
   function buildTodoList(lanes) {
@@ -756,8 +747,8 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
     <div style={{ overflowY: 'auto', height: '100%' }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '16px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginBottom: 12 }}>
-          <button className="btn-ghost btn-sm" onClick={() => copyTo('md', buildMarkdown())}>
-            {copiedKey === 'md' ? '✓ Kopiert' : '⎘ Markdown'}
+          <button className="btn-ghost btn-sm" title="Als TSV kopieren (in Excel/Sheets einfügen)" onClick={() => copyTo('tsv', buildTSV())}>
+            {copiedKey === 'tsv' ? '✓ Kopiert' : '⎘ Tabelle'}
           </button>
           <button className="btn-ghost btn-sm" onClick={() => copyTo('todo', buildTodoList(allLanes))}>
             {copiedKey === 'todo' ? '✓ Kopiert' : '⎘ Todo-Liste'}
