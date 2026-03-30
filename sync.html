@@ -693,7 +693,7 @@ function renderProjects() {
         <div class="btn-row" style="margin-top:.625rem">
           <button class="btn-primary" onclick="pushProject('${esc(p.id)}')">↑ Push</button>
           <button class="btn-ghost"   onclick="pullProject('${esc(p.id)}')">↓ Pull</button>
-          ${cached ? `<button class="btn-ghost" onclick="forgetKey('${esc(p.id)}');renderProjects()">Schlüssel vergessen</button>` : ''}
+          ${cached ? `<button class="btn-ghost" onclick="forgetKey('${esc(p.id)}');renderProjects()">Passwort neu eingeben</button>` : ''}
         </div>
         <div class="proj-log" id="proj-log-${esc(p.id)}"></div>
       </div>`;
