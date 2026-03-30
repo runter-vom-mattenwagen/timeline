@@ -228,6 +228,31 @@
 
     .empty { font-size: 0.875rem; color: var(--text-muted); }
 
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-header .card-title { margin-bottom: 0; }
+    .card-header .card-summary {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      flex: 1;
+      margin: 0 0.75rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-toggle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .card-body { margin-top: 1rem; }
+    .card-body.hidden { display: none; }
+
     .discover-item {
       display: flex;
       align-items: center;
@@ -251,8 +276,13 @@
 
 <!-- ── WebDAV Setup ─────────────────────────────────────────── -->
 <div class="card" id="setup-card">
-  <div class="card-title">WebDAV Endpoint</div>
+  <div class="card-header" onclick="toggleSetup()">
+    <div class="card-title">WebDAV Endpoint</div>
+    <span class="card-summary" id="setup-summary"></span>
+    <span class="card-toggle" id="setup-toggle">▾</span>
+  </div>
 
+  <div class="card-body" id="setup-body">
   <div class="field">
     <label>
       <span class="has-tooltip">
@@ -289,6 +319,7 @@
     <button class="btn-ghost"   onclick="saveSetup()">Speichern</button>
     <span id="conn-status"></span>
   </div>
+  </div><!-- /.card-body -->
 </div>
 
 <!-- ── Projects ─────────────────────────────────────────────── -->
@@ -482,8 +513,10 @@ class WebDAVProvider {
     if (!r.ok && r.status !== 207) throw new Error(`PROPFIND ${r.status} ${r.statusText}`);
     const xml  = await r.text();
     const doc  = new DOMParser().parseFromString(xml, 'application/xml');
-    const hrefs = [...doc.querySelectorAll('response href')].map(el => el.textContent.trim());
-    // Extract just the filename from each href, keep only .enc files
+    // getElementsByTagNameNS handles DAV: namespace correctly
+    const hrefs = [...doc.getElementsByTagNameNS('DAV:', 'href')]
+      .map(el => el.textContent.trim());
+    // First entry is the folder itself — skip it; keep only .enc files
     return hrefs
       .map(h => decodeURIComponent(h.split('/').pop()))
       .filter(name => name.endsWith('.enc'));
@@ -864,6 +897,7 @@ function saveSetup() {
     if (password) sessionStorage.setItem('tl-sync-dav-pass', password);
   }
   saveConfig(cfg);
+  updateSetupSummary();
   document.getElementById('conn-status').innerHTML =
     '<span class="badge badge-ok">Gespeichert</span>';
   setTimeout(() => { document.getElementById('conn-status').innerHTML = ''; }, 2000);
@@ -888,8 +922,28 @@ async function testConnection() {
   }
 }
 
+// ── Setup collapse ─────────────────────────────────────────────────────────
+function toggleSetup() {
+  const body    = document.getElementById('setup-body');
+  const toggle  = document.getElementById('setup-toggle');
+  const hidden  = body.classList.toggle('hidden');
+  toggle.textContent = hidden ? '▸' : '▾';
+}
+
+function updateSetupSummary() {
+  const url     = document.getElementById('dav-url').value.trim();
+  const summary = document.getElementById('setup-summary');
+  summary.textContent = url ? new URL(url).hostname : '';
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 loadSetup();
+updateSetupSummary();
+// Auto-collapse if already configured
+if (document.getElementById('dav-url').value) {
+  document.getElementById('setup-body').classList.add('hidden');
+  document.getElementById('setup-toggle').textContent = '▸';
+}
 renderProjects();
 </script>
 </body>
