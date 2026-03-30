@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timeline · Sync</title>
+  <link rel="icon" href="sync-favicon.svg" type="image/svg+xml">
   <style>
     :root {
       --bg: #f4f4f5;
@@ -18,11 +19,14 @@
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #0f0f0f;
-        --surface: #18181b;
-        --border: #3f3f46;
-        --text: #e4e4e7;
-        --text-muted: #71717a;
+        --bg: #0e1014;
+        --surface: #181b22;
+        --bg-input: #13161e;
+        --border: #2c3245;
+        --text: #e4e6eb;
+        --text-muted: #6b7080;
+        --accent: #4e74f5;
+        --accent-hover: #7b95ff;
       }
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -81,7 +85,7 @@
       padding: 0.4375rem 0.625rem;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      background: var(--bg);
+      background: var(--bg-input, var(--bg));
       color: var(--text);
       font-size: 0.875rem;
       font-family: var(--font);
@@ -305,27 +309,36 @@
     <label>Benutzername</label>
     <input type="text" id="dav-user" autocomplete="username">
   </div>
-  <div class="field">
-    <label>Passwort <span id="dav-pass-saved" style="display:none;font-weight:400;color:var(--text-muted)">(gespeichert — leer lassen um zu behalten)</span></label>
-    <input type="password" id="dav-pass" autocomplete="new-password" placeholder="Passwort eingeben">
+  <div id="dav-pass-input-section">
+    <div class="field">
+      <label>Passwort <span style="font-weight:400;color:var(--text-muted)">(WebDAV-Zugang)</span></label>
+      <input type="password" id="dav-pass" autocomplete="new-password" placeholder="Passwort eingeben" onkeydown="if(event.key==='Enter') testConnection()">
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="testConnection()">Verbindung einrichten</button>
+      <span id="conn-status"></span>
+    </div>
   </div>
-  <label class="checkbox-label">
-    <input type="checkbox" id="save-dav-pass">
-    Passwort in localStorage speichern
-    <span style="color:#d97706;font-size:.75rem">&nbsp;— wird im Klartext gespeichert</span>
-  </label>
 
-  <div class="btn-row">
-    <button class="btn-primary" onclick="testConnection()">Verbindung testen</button>
-    <button class="btn-ghost"   onclick="saveSetup()">Speichern</button>
-    <span id="conn-status"></span>
+  <div id="dav-pass-stored-section" style="display:none">
+    <div style="display:flex;align-items:center;gap:.625rem;padding:.5rem 0;margin-top:.5rem;border-top:1px solid var(--border)">
+      <span style="font-size:.8125rem;color:var(--text-muted)">Passwort</span>
+      <span class="badge badge-ok">Sitzung</span>
+      <div style="margin-left:auto;display:flex;gap:.375rem">
+        <button class="btn-ghost" style="padding:.25rem .625rem;font-size:.75rem" onclick="clearDavPass()">Passwort neu eingeben</button>
+        <button class="btn-danger" style="padding:.25rem .625rem;font-size:.75rem" onclick="removeConnection()">Verbindung entfernen</button>
+      </div>
+    </div>
   </div>
   </div><!-- /.card-body -->
 </div>
 
 <!-- ── Projects ─────────────────────────────────────────────── -->
 <div class="card">
-  <div class="card-title">Projekte</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+    <div class="card-title" style="margin-bottom:0">Projekte</div>
+    <button class="btn-ghost" style="padding:.2rem .5rem;font-size:.95rem" onclick="checkAllServerStatus()" title="Server-Status neu prüfen">⟳</button>
+  </div>
   <div id="project-list"></div>
 </div>
 
@@ -333,11 +346,11 @@
 <div class="card">
   <div class="card-title">Vom Server laden</div>
   <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem;line-height:1.5">
-    Sucht alle verschlüsselten Dateien im WebDAV-Ordner und versucht sie mit dem eingegebenen Passwort zu entschlüsseln.
+    Sucht alle verschlüsselten Dateien im WebDAV-Ordner. Bereits vorhandene Projekte werden angezeigt, noch nicht importierte können geladen werden.
   </p>
   <div class="field">
-    <label>Passwort</label>
-    <input type="password" id="discover-pass" autocomplete="off" placeholder="Projektpasswort eingeben">
+    <label>Projektpasswort <span style="font-weight:400;color:var(--text-muted)">(Verschlüsselung)</span></label>
+    <input type="password" id="discover-pass" autocomplete="off" placeholder="Dasselbe Passwort wie beim Push/Pull" onkeydown="if(event.key==='Enter') discoverProjects()">
   </div>
   <div class="btn-row">
     <button class="btn-ghost" onclick="discoverProjects()">Suchen</button>
@@ -536,7 +549,7 @@ class WebDAVProvider {
 function buildProvider() {
   const cfg = loadConfig();
   const dav = cfg.webdav || {};
-  const pass = dav.savePass ? dav.password : sessionStorage.getItem('tl-sync-dav-pass');
+  const pass = sessionStorage.getItem('tl-sync-dav-pass');
   if (!dav.url || !dav.username || !pass) return null;
   return new WebDAVProvider({ url: dav.url, username: dav.username, password: pass });
 }
@@ -656,20 +669,6 @@ async function discoverProjects() {
       return;
     }
 
-    results.innerHTML = found.map(({ filename, project, savedAt }) => `
-      <div class="discover-item">
-        <div>
-          <div class="discover-name">${esc(project.name)}</div>
-          <div class="discover-meta">
-            ${project.activities?.length ?? 0} Aktivitäten · gespeichert ${fmt(savedAt)}
-          </div>
-        </div>
-        <button class="btn-primary"
-          onclick="importDiscovered('${esc(project.id)}', '${esc(filename)}')">
-          Importieren
-        </button>
-      </div>`).join('');
-
     // Cache password and filename in meta so import + future push/pull work directly
     const meta = loadMeta();
     for (const { filename, project } of found) {
@@ -679,6 +678,52 @@ async function discoverProjects() {
     }
     saveMeta(meta);
     renderProjects();
+
+    const localIds = new Set(getProjects().map(p => p.id));
+    results.innerHTML = found.map(({ filename, project, savedAt }) => {
+      const isLocal = localIds.has(project.id);
+      const pm = meta[project.id] || {};
+
+      let badge = '';
+      let localLine = '';
+      if (isLocal) {
+        const inSync    = pm.lastPush && Math.abs(savedAt - pm.lastPush) < 10_000;
+        const neverSync = !pm.lastPush && !pm.lastPull;
+        const serverNew = !inSync && savedAt > (pm.remoteSavedAt || 0);
+
+        if (inSync) {
+          badge = '<span class="badge badge-ok">Synchron</span>';
+        } else if (neverSync) {
+          badge = '<span class="badge badge-warn">Lokal vorhanden</span>';
+        } else if (serverNew) {
+          badge = '<span class="badge badge-warn">Server neuer</span>';
+        } else {
+          badge = '<span class="badge badge-ok">Aktuell</span>';
+        }
+
+        const localTs = pm.lastPush || pm.lastPull;
+        if (localTs) localLine = `<span>Lokal: ${fmt(localTs)}</span>`;
+      }
+
+      return `
+      <div class="discover-item">
+        <div>
+          <div class="discover-name">${esc(project.name)}</div>
+          <div class="discover-meta" style="display:flex;gap:.75rem;flex-wrap:wrap">
+            <span>${project.activities?.length ?? 0} Aktivitäten</span>
+            <span>Server: ${fmt(savedAt)}</span>
+            ${localLine}
+          </div>
+        </div>
+        ${isLocal
+          ? badge
+          : `<div style="display:flex;align-items:center;gap:.375rem;flex-shrink:0">
+               <span class="badge badge-err">Nicht lokal</span>
+               <button class="btn-primary" onclick="importDiscovered('${esc(project.id)}', '${esc(filename)}')">Importieren</button>
+             </div>`
+        }
+      </div>`;
+    }).join('');
 
   } catch (e) {
     results.innerHTML = `<p class="empty" style="margin-top:.5rem;color:#ef4444">✗ ${esc(e.message)}</p>`;
@@ -875,7 +920,6 @@ function renderProjects() {
 
   list.innerHTML = projects.map(p => {
     const pm      = meta[p.id] || {};
-    const cached  = _passCache.has(p.id);
     const status  = _serverStatus.get(p.id);
     const canPull = status === 'exists';
 
@@ -886,27 +930,25 @@ function renderProjects() {
       error:    '<span class="badge badge-err">Fehler</span>',
     }[status] ?? '';
 
-    const passBadge = cached ? '<span class="badge badge-ok">Passwort aktiv</span>' : '';
+    const timestamps = (pm.lastPush || pm.lastPull)
+      ? `Push: ${fmt(pm.lastPush)} · Pull: ${fmt(pm.lastPull)}`
+      : 'Noch nicht synchronisiert';
 
     return `
       <div class="proj-card" data-proj-id="${esc(p.id)}">
         <div class="proj-header">
           <span class="proj-name">${esc(p.name)}</span>
           <span style="display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;justify-content:flex-end">
-            ${serverBadge}${passBadge}
+            ${serverBadge}
             <span class="spinner"></span>
           </span>
         </div>
         <div class="proj-meta">
-          ${p.activities?.length ?? 0} Aktivitäten · ${p.milestones?.length ?? 0} Meilensteine
-        </div>
-        <div class="proj-meta" style="margin-top:.15rem">
-          Letzter Push: ${fmt(pm.lastPush)} · Letzter Pull: ${fmt(pm.lastPull)}
+          ${p.activities?.length ?? 0} Aktivitäten · ${p.milestones?.length ?? 0} Meilensteine · ${timestamps}
         </div>
         <div class="btn-row" style="margin-top:.625rem">
           <button class="btn-primary" onclick="pushProject('${esc(p.id)}')">↑ Push</button>
           ${canPull ? `<button class="btn-ghost" onclick="pullProject('${esc(p.id)}')">↓ Pull</button>` : ''}
-          ${cached ? `<button class="btn-ghost" onclick="forgetKey('${esc(p.id)}');renderProjects()">Passwort neu eingeben</button>` : ''}
         </div>
         <div class="proj-log" id="proj-log-${esc(p.id)}"></div>
       </div>`;
@@ -917,46 +959,52 @@ function renderProjects() {
 function loadSetup() {
   const cfg = loadConfig();
   const dav = cfg.webdav || {};
+
+  // Migrate: password previously saved to localStorage → move to sessionStorage once
+  if (dav.savePass && dav.password && !sessionStorage.getItem('tl-sync-dav-pass')) {
+    sessionStorage.setItem('tl-sync-dav-pass', dav.password);
+    delete cfg.webdav.password;
+    delete cfg.webdav.savePass;
+    saveConfig(cfg);
+  }
+
   document.getElementById('dav-url').value  = dav.url      || '';
   document.getElementById('dav-user').value = dav.username || '';
-  document.getElementById('save-dav-pass').checked = !!dav.savePass;
-  // Never pre-fill the password field — show a hint if one is already stored
-  const hasSaved = dav.savePass && dav.password;
-  const hasSS    = !!sessionStorage.getItem('tl-sync-dav-pass');
-  document.getElementById('dav-pass-saved').style.display =
-    (hasSaved || hasSS) ? 'inline' : 'none';
 
+  const hasPass = !!sessionStorage.getItem('tl-sync-dav-pass');
+  document.getElementById('dav-pass-input-section').style.display  = hasPass ? 'none' : '';
+  document.getElementById('dav-pass-stored-section').style.display = hasPass ? '' : 'none';
 }
 
 function saveSetup() {
   const url      = document.getElementById('dav-url').value.trim();
   const username = document.getElementById('dav-user').value.trim();
   const password = document.getElementById('dav-pass').value;
-  const savePass = document.getElementById('save-dav-pass').checked;
 
-  const cfg     = loadConfig();
-  const existing = cfg.webdav || {};
-  cfg.webdav = { url, username, savePass };
-
-  if (password) {
-    // New password entered
-    if (savePass) {
-      cfg.webdav.password = password;
-    } else {
-      delete cfg.webdav.password;
-      sessionStorage.setItem('tl-sync-dav-pass', password);
-    }
-  } else {
-    // Field empty — keep existing stored password
-    if (savePass && existing.password) cfg.webdav.password = existing.password;
-  }
-
+  const cfg = loadConfig();
+  cfg.webdav = { url, username };
+  if (password) sessionStorage.setItem('tl-sync-dav-pass', password);
   saveConfig(cfg);
-  loadSetup(); // refresh the "gespeichert" hint
   updateSetupSummary();
-  document.getElementById('conn-status').innerHTML =
-    '<span class="badge badge-ok">Gespeichert</span>';
-  setTimeout(() => { document.getElementById('conn-status').innerHTML = ''; }, 2000);
+}
+
+function clearDavPass() {
+  sessionStorage.removeItem('tl-sync-dav-pass');
+  document.getElementById('dav-pass').value = '';
+  loadSetup();
+  updateSetupSummary();
+  renderProjects();
+}
+
+function removeConnection() {
+  sessionStorage.removeItem('tl-sync-dav-pass');
+  const cfg = loadConfig();
+  delete cfg.webdav;
+  saveConfig(cfg);
+  document.getElementById('dav-pass').value = '';
+  loadSetup();
+  updateSetupSummary();
+  renderProjects();
 }
 
 async function testConnection() {
@@ -970,9 +1018,12 @@ async function testConnection() {
   statusEl.innerHTML = '<span class="spinner" style="display:inline-block"></span>';
   try {
     const ok = await provider.test();
-    statusEl.innerHTML = ok
-      ? '<span class="badge badge-ok">Verbunden ✓</span>'
-      : '<span class="badge badge-err">Verbindung fehlgeschlagen</span>';
+    if (ok) {
+      statusEl.innerHTML = '<span class="badge badge-ok">Verbunden ✓</span>';
+      setTimeout(() => { loadSetup(); checkAllServerStatus(); }, 800);
+    } else {
+      statusEl.innerHTML = '<span class="badge badge-err">Verbindung fehlgeschlagen</span>';
+    }
   } catch (e) {
     statusEl.innerHTML = `<span class="badge badge-err">${esc(e.message)}</span>`;
   }
