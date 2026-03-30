@@ -138,24 +138,47 @@
       .badge-warn { background: #451a03; color: #fcd34d; }
     }
 
-    /* ── Note ── */
-    .note {
+    /* ── Tooltip ── */
+    .has-tooltip { position: relative; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .tooltip-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+      font-size: 0.625rem;
+      font-weight: 700;
+      cursor: default;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .tooltip-box {
+      display: none;
+      position: absolute;
+      left: 0; top: calc(100% + 6px);
+      width: 320px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.625rem 0.75rem;
       font-size: 0.8125rem;
       color: var(--text-muted);
-      line-height: 1.5;
-      padding: 0.625rem 0.75rem;
-      background: var(--bg);
-      border-left: 3px solid var(--border);
-      border-radius: 0 var(--radius) var(--radius) 0;
-      margin-top: 1rem;
+      line-height: 1.55;
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
     }
-    .note code {
+    .tooltip-box code {
       font-family: monospace;
       font-size: 0.8125rem;
-      background: var(--border);
+      background: var(--bg);
+      border: 1px solid var(--border);
       padding: 0.05em 0.3em;
       border-radius: 3px;
     }
+    .has-tooltip:hover .tooltip-box,
+    .has-tooltip:focus-within .tooltip-box { display: block; }
 
     /* ── Project cards ── */
     .proj-card {
@@ -218,7 +241,20 @@
   <div class="card-title">WebDAV Endpoint</div>
 
   <div class="field">
-    <label>URL</label>
+    <label>
+      <span class="has-tooltip">
+        URL
+        <span class="tooltip-icon">?</span>
+        <span class="tooltip-box">
+          Der WebDAV-Server muss CORS erlauben. nginx-Config:<br><br>
+          <code>add_header Access-Control-Allow-Origin $http_origin always;</code><br>
+          <code>add_header Access-Control-Allow-Credentials "true" always;</code><br>
+          <code>add_header Access-Control-Allow-Methods "GET, PUT, PROPFIND, OPTIONS" always;</code><br>
+          <code>add_header Access-Control-Allow-Headers "Authorization, Content-Type, Depth" always;</code><br><br>
+          Preflight (OPTIONS) separat mit <code>return 204</code> beantworten.
+        </span>
+      </span>
+    </label>
     <input type="url" id="dav-url"
            placeholder="https://cloud.example.com/remote.php/dav/files/user/timeline/">
   </div>
@@ -234,14 +270,6 @@
     <input type="checkbox" id="save-dav-pass">
     Passwort in localStorage speichern
   </label>
-
-  <div class="note">
-    <strong>CORS:</strong> Der Browser erlaubt nur Anfragen, wenn der WebDAV-Server den Header
-    <code>Access-Control-Allow-Origin: <span id="origin-hint"></span></code> setzt.
-    Bei Nextcloud hinter Traefik: Middleware mit diesem Header ergänzen.
-    Erlaubte Methoden: <code>GET PUT PROPFIND OPTIONS</code>,
-    Erlaubte Header: <code>Authorization Content-Type Depth</code>.
-  </div>
 
   <div class="btn-row">
     <button class="btn-primary" onclick="testConnection()">Verbindung testen</button>
@@ -683,7 +711,7 @@ function loadSetup() {
     const ss = sessionStorage.getItem('tl-sync-dav-pass');
     if (ss) document.getElementById('dav-pass').value = ss;
   }
-  document.getElementById('origin-hint').textContent = location.origin;
+
 }
 
 function saveSetup() {
