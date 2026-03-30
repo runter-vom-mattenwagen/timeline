@@ -306,12 +306,13 @@
     <input type="text" id="dav-user" autocomplete="username">
   </div>
   <div class="field">
-    <label>Passwort</label>
-    <input type="password" id="dav-pass" autocomplete="current-password">
+    <label>Passwort <span id="dav-pass-saved" style="display:none;font-weight:400;color:var(--text-muted)">(gespeichert — leer lassen um zu behalten)</span></label>
+    <input type="password" id="dav-pass" autocomplete="new-password" placeholder="Passwort eingeben">
   </div>
   <label class="checkbox-label">
     <input type="checkbox" id="save-dav-pass">
     Passwort in localStorage speichern
+    <span style="color:#d97706;font-size:.75rem">&nbsp;— wird im Klartext gespeichert</span>
   </label>
 
   <div class="btn-row">
@@ -919,12 +920,11 @@ function loadSetup() {
   document.getElementById('dav-url').value  = dav.url      || '';
   document.getElementById('dav-user').value = dav.username || '';
   document.getElementById('save-dav-pass').checked = !!dav.savePass;
-  if (dav.savePass && dav.password) {
-    document.getElementById('dav-pass').value = dav.password;
-  } else {
-    const ss = sessionStorage.getItem('tl-sync-dav-pass');
-    if (ss) document.getElementById('dav-pass').value = ss;
-  }
+  // Never pre-fill the password field — show a hint if one is already stored
+  const hasSaved = dav.savePass && dav.password;
+  const hasSS    = !!sessionStorage.getItem('tl-sync-dav-pass');
+  document.getElementById('dav-pass-saved').style.display =
+    (hasSaved || hasSS) ? 'inline' : 'none';
 
 }
 
@@ -934,15 +934,25 @@ function saveSetup() {
   const password = document.getElementById('dav-pass').value;
   const savePass = document.getElementById('save-dav-pass').checked;
 
-  const cfg = loadConfig();
+  const cfg     = loadConfig();
+  const existing = cfg.webdav || {};
   cfg.webdav = { url, username, savePass };
-  if (savePass) {
-    cfg.webdav.password = password;
+
+  if (password) {
+    // New password entered
+    if (savePass) {
+      cfg.webdav.password = password;
+    } else {
+      delete cfg.webdav.password;
+      sessionStorage.setItem('tl-sync-dav-pass', password);
+    }
   } else {
-    delete cfg.webdav.password;
-    if (password) sessionStorage.setItem('tl-sync-dav-pass', password);
+    // Field empty — keep existing stored password
+    if (savePass && existing.password) cfg.webdav.password = existing.password;
   }
+
   saveConfig(cfg);
+  loadSetup(); // refresh the "gespeichert" hint
   updateSetupSummary();
   document.getElementById('conn-status').innerHTML =
     '<span class="badge badge-ok">Gespeichert</span>';
