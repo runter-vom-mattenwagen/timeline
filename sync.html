@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline · Sync</title>
+  <link rel="icon" href="sync-favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #f4f4f5;
+      --surface: #fff;
+      --border: #d4d4d8;
+      --text: #18181b;
+      --text-muted: #71717a;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --radius: 6px;
+      --font: system-ui, -apple-system, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1014;
+        --surface: #181b22;
+        --bg-input: #13161e;
+        --border: #2c3245;
+        --text: #e4e6eb;
+        --text-muted: #6b7080;
+        --accent: #4e74f5;
+        --accent-hover: #7b95ff;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 1.5rem;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+    header h1 { font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; }
+    header a { font-size: 0.8125rem; color: var(--text-muted); text-decoration: none; }
+    header a:hover { color: var(--accent); }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .card-title {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    /* ── Form ── */
+    .field { margin-bottom: 0.75rem; }
+    .field:last-of-type { margin-bottom: 0; }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+    }
+    .field input[type=text],
+    .field input[type=url],
+    .field input[type=password] {
+      width: 100%;
+      padding: 0.4375rem 0.625rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-input, var(--bg));
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: var(--font);
+    }
+    .field input:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      margin-top: 0.625rem;
+    }
+
+    /* ── Buttons ── */
+    .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-top: 1rem; }
+    button {
+      padding: 0.4375rem 0.875rem;
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      font-family: var(--font);
+      line-height: 1;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:not(:disabled):hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn-ghost { background: transparent; border-color: var(--border); color: var(--text); }
+    .btn-ghost:not(:disabled):hover { background: var(--border); }
+    .btn-danger { background: transparent; border-color: #ef4444; color: #ef4444; }
+    .btn-danger:not(:disabled):hover { background: #ef4444; color: #fff; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      vertical-align: middle;
+    }
+    .badge-ok   { background: #dcfce7; color: #15803d; }
+    .badge-err  { background: #fee2e2; color: #b91c1c; }
+    .badge-warn { background: #fef3c7; color: #92400e; }
+    @media (prefers-color-scheme: dark) {
+      .badge-ok   { background: #14532d; color: #86efac; }
+      .badge-err  { background: #450a0a; color: #fca5a5; }
+      .badge-warn { background: #451a03; color: #fcd34d; }
+    }
+
+    /* ── Tooltip ── */
+    .has-tooltip { position: relative; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .tooltip-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+      font-size: 0.625rem;
+      font-weight: 700;
+      cursor: default;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .tooltip-box {
+      display: none;
+      position: absolute;
+      left: 0; top: calc(100% + 6px);
+      width: 320px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.625rem 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    }
+    .tooltip-box code {
+      font-family: monospace;
+      font-size: 0.8125rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 0.05em 0.3em;
+      border-radius: 3px;
+    }
+    .has-tooltip:hover .tooltip-box,
+    .has-tooltip:focus-within .tooltip-box { display: block; }
+
+    /* ── Project cards ── */
+    .proj-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.875rem 1rem;
+      margin-bottom: 0.625rem;
+    }
+    .proj-card:last-child { margin-bottom: 0; }
+    .proj-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.3rem;
+    }
+    .proj-name  { font-weight: 600; font-size: 0.9375rem; }
+    .proj-meta  { font-size: 0.75rem; color: var(--text-muted); line-height: 1.6; }
+    .proj-log   { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.375rem; min-height: 1.1em; font-style: italic; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: none;
+      width: 14px; height: 14px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.55s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Dialog ── */
+    dialog {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) * 1.5);
+      padding: 1.5rem;
+      max-width: 400px;
+      width: 90vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    }
+    dialog::backdrop { background: rgba(0,0,0,.45); }
+    dialog h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+    dialog p  { font-size: 0.875rem; color: var(--text-muted); line-height: 1.55; white-space: pre-line; }
+    dialog .field { margin-top: 0.75rem; }
+
+    .empty { font-size: 0.875rem; color: var(--text-muted); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-header .card-title { margin-bottom: 0; }
+    .card-header .card-summary {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      flex: 1;
+      margin: 0 0.75rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-toggle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .card-body { margin-top: 1rem; }
+    .card-body.hidden { display: none; }
+
+    .discover-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.625rem 0;
+      border-top: 1px solid var(--border);
+      gap: 1rem;
+    }
+    .discover-item:first-child { border-top: none; }
+    .discover-name { font-weight: 600; font-size: 0.9375rem; }
+    .discover-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+    #discover-results { margin-top: 0.75rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Timeline · Sync</h1>
+  <a href="./">← zur App</a>
+</header>
+
+<!-- ── WebDAV Setup ─────────────────────────────────────────── -->
+<div class="card" id="setup-card">
+  <div class="card-header" onclick="toggleSetup()">
+    <div class="card-title">WebDAV Endpoint</div>
+    <span class="card-summary" id="setup-summary"></span>
+    <span class="card-toggle" id="setup-toggle">▾</span>
+  </div>
+
+  <div class="card-body" id="setup-body">
+  <div class="field">
+    <label>
+      <span class="has-tooltip">
+        URL
+        <span class="tooltip-icon">?</span>
+        <span class="tooltip-box">
+          Der WebDAV-Server muss CORS erlauben. nginx-Config:<br><br>
+          <code>add_header Access-Control-Allow-Origin $http_origin always;</code><br>
+          <code>add_header Access-Control-Allow-Credentials "true" always;</code><br>
+          <code>add_header Access-Control-Allow-Methods "GET, PUT, PROPFIND, OPTIONS" always;</code><br>
+          <code>add_header Access-Control-Allow-Headers "Authorization, Content-Type, Depth" always;</code><br><br>
+          Preflight (OPTIONS) separat mit <code>return 204</code> beantworten.
+        </span>
+      </span>
+    </label>
+    <input type="url" id="dav-url"
+           placeholder="https://cloud.example.com/remote.php/dav/files/user/timeline/">
+  </div>
+  <div class="field">
+    <label>Benutzername</label>
+    <input type="text" id="dav-user" autocomplete="username">
+  </div>
+  <div id="dav-pass-input-section">
+    <div class="field">
+      <label>Passwort <span style="font-weight:400;color:var(--text-muted)">(WebDAV-Zugang)</span></label>
+      <input type="password" id="dav-pass" autocomplete="new-password" placeholder="Passwort eingeben" onkeydown="if(event.key==='Enter') testConnection()">
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="testConnection()">Verbindung einrichten</button>
+      <span id="conn-status"></span>
+    </div>
+  </div>
+
+  <div id="dav-pass-stored-section" style="display:none">
+    <div style="display:flex;align-items:center;gap:.625rem;padding:.5rem 0;margin-top:.5rem;border-top:1px solid var(--border)">
+      <span style="font-size:.8125rem;color:var(--text-muted)">Passwort</span>
+      <span class="badge badge-ok">Sitzung</span>
+      <div style="margin-left:auto;display:flex;gap:.375rem">
+        <button class="btn-ghost" style="padding:.25rem .625rem;font-size:.75rem" onclick="clearDavPass()">Passwort neu eingeben</button>
+        <button class="btn-danger" style="padding:.25rem .625rem;font-size:.75rem" onclick="removeConnection()">Verbindung entfernen</button>
+      </div>
+    </div>
+  </div>
+  </div><!-- /.card-body -->
+</div>
+
+<!-- ── Projects ─────────────────────────────────────────────── -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+    <div class="card-title" style="margin-bottom:0">Projekte</div>
+    <button class="btn-ghost" style="padding:.2rem .5rem;font-size:.95rem" onclick="checkAllServerStatus()" title="Server-Status neu prüfen">⟳</button>
+  </div>
+  <div id="project-list"></div>
+</div>
+
+<!-- ── Discover ──────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-title">Vom Server laden</div>
+  <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem;line-height:1.5">
+    Sucht alle verschlüsselten Dateien im WebDAV-Ordner. Bereits vorhandene Projekte werden angezeigt, noch nicht importierte können geladen werden.
+  </p>
+  <div class="field">
+    <label>Projektpasswort <span style="font-weight:400;color:var(--text-muted)">(Verschlüsselung)</span></label>
+    <input type="password" id="discover-pass" autocomplete="off" placeholder="Dasselbe Passwort wie beim Push/Pull" onkeydown="if(event.key==='Enter') discoverProjects()">
+  </div>
+  <div class="btn-row">
+    <button class="btn-ghost" onclick="discoverProjects()">Suchen</button>
+    <span class="spinner" id="discover-spinner"></span>
+  </div>
+  <div id="discover-results"></div>
+</div>
+
+<!-- ── Password dialog ──────────────────────────────────────── -->
+<dialog id="dlg-pass">
+  <h3 id="dlg-pass-title">Projektpasswort</h3>
+  <p id="dlg-pass-msg"></p>
+  <div class="field">
+    <label>Passwort</label>
+    <input type="password" id="dlg-pass-input" autocomplete="off">
+  </div>
+  <div class="btn-row">
+    <button class="btn-primary" id="dlg-pass-ok">OK</button>
+    <button class="btn-ghost" onclick="document.getElementById('dlg-pass').close()">Abbrechen</button>
+  </div>
+</dialog>
+
+<!-- ── Conflict dialog ──────────────────────────────────────── -->
+<dialog id="dlg-conflict">
+  <h3>Sync-Konflikt</h3>
+  <p id="dlg-conflict-msg"></p>
+  <div class="btn-row">
+    <button class="btn-primary" id="dlg-conflict-local">Lokal behalten</button>
+    <button class="btn-ghost"   id="dlg-conflict-remote">Remote übernehmen</button>
+    <button class="btn-ghost" onclick="document.getElementById('dlg-conflict').close()">Abbrechen</button>
+  </div>
+</dialog>
+
+<script>
+'use strict';
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const LS_CONFIG = 'timeline-sync-config';
+const LS_META   = 'timeline-sync-meta';
+const LS_DATA   = 'timeline-viz-data';
+
+// ── In-memory caches (never written to storage) ────────────────────────────
+const _passCache    = new Map(); // Map<projectId, string>
+const _serverStatus = new Map(); // Map<projectId, 'checking'|'exists'|'missing'|'error'>
+
+// ── Crypto ─────────────────────────────────────────────────────────────────
+// File format: pbkdf2_salt(16) || aes_iv(12) || ciphertext
+// Salt is embedded so any file can be decrypted with only the password.
+const Crypto = {
+  async _deriveKey(password, salt) {
+    const raw = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 200_000, hash: 'SHA-256' },
+      raw,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  },
+
+  async encrypt(plaintext, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await this._deriveKey(password, salt);
+    const ct   = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)
+    );
+    // Layout: salt(16) || iv(12) || ciphertext
+    const out = new Uint8Array(16 + 12 + ct.byteLength);
+    out.set(salt, 0);
+    out.set(iv, 16);
+    out.set(new Uint8Array(ct), 28);
+    return out;
+  },
+
+  async decrypt(buffer, password) {
+    const b    = new Uint8Array(buffer);
+    const salt = b.slice(0, 16);
+    const iv   = b.slice(16, 28);
+    const ct   = b.slice(28);
+    const key  = await this._deriveKey(password, salt);
+    const pt   = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return new TextDecoder().decode(pt);
+  },
+
+  // Derive a stable filename from projectId (no password involved).
+  async fileHash(projectId) {
+    const data = new TextEncoder().encode('tl-sync:' + projectId);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    const hex  = Array.from(new Uint8Array(hash))
+                      .slice(0, 12)
+                      .map(b => b.toString(16).padStart(2, '0'))
+                      .join('');
+    return hex + '.enc';
+  }
+};
+
+// ── Password cache management ───────────────────────────────────────────────
+function forgetKey(projectId) {
+  _passCache.delete(projectId);
+}
+
+// ── Storage helpers ────────────────────────────────────────────────────────
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem(LS_CONFIG) || '{}'); } catch { return {}; }
+}
+function saveConfig(c) { localStorage.setItem(LS_CONFIG, JSON.stringify(c)); }
+
+function loadMeta() {
+  try { return JSON.parse(localStorage.getItem(LS_META) || '{}'); } catch { return {}; }
+}
+function saveMeta(m) { localStorage.setItem(LS_META, JSON.stringify(m)); }
+
+function getProjects() {
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_DATA) || '{}');
+    return d.projects || [];
+  } catch { return []; }
+}
+function getProject(id) {
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_DATA) || '{}');
+    return (d.projects || []).find(p => p.id === id) ?? null;
+  } catch { return null; }
+}
+function saveProject(project) {
+  const raw = localStorage.getItem(LS_DATA);
+  const d   = raw ? JSON.parse(raw) : { projects: [] };
+  if (!d.projects) d.projects = [];
+  const idx = d.projects.findIndex(p => p.id === project.id);
+  if (idx >= 0) d.projects[idx] = project;
+  else d.projects.push(project);
+  localStorage.setItem(LS_DATA, JSON.stringify(d));
+}
+
+// ── WebDAV Provider ────────────────────────────────────────────────────────
+class WebDAVProvider {
+  constructor({ url, username, password }) {
+    this.base = url.endsWith('/') ? url : url + '/';
+    this.auth = 'Basic ' + btoa(username + ':' + password);
+  }
+  _h(extra = {}) { return { 'Authorization': this.auth, ...extra }; }
+
+  async test() {
+    const r = await fetch(this.base, {
+      method: 'PROPFIND',
+      headers: this._h({ 'Depth': '0' })
+    });
+    return r.ok || r.status === 207;
+  }
+  async push(filename, bytes) {
+    const r = await fetch(this.base + filename, {
+      method: 'PUT',
+      headers: this._h({ 'Content-Type': 'application/octet-stream' }),
+      body: bytes
+    });
+    if (!r.ok) throw new Error(`PUT ${r.status} ${r.statusText}`);
+  }
+  async pull(filename) {
+    const r = await fetch(this.base + filename, { headers: this._h() });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`GET ${r.status} ${r.statusText}`);
+    return r.arrayBuffer();
+  }
+
+  async exists(filename) {
+    const r = await fetch(this.base + filename, {
+      method: 'PROPFIND',
+      headers: this._h({ 'Depth': '0' })
+    });
+    return r.ok || r.status === 207;
+  }
+
+  async list() {
+    const r = await fetch(this.base, {
+      method: 'PROPFIND',
+      headers: this._h({ 'Depth': '1', 'Content-Type': 'application/xml' }),
+      body: `<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:displayname/></d:prop></d:propfind>`
+    });
+    if (!r.ok && r.status !== 207) throw new Error(`PROPFIND ${r.status} ${r.statusText}`);
+    const xml  = await r.text();
+    const doc  = new DOMParser().parseFromString(xml, 'application/xml');
+    // getElementsByTagNameNS handles DAV: namespace correctly
+    const hrefs = [...doc.getElementsByTagNameNS('DAV:', 'href')]
+      .map(el => el.textContent.trim());
+    // First entry is the folder itself — skip it; keep only .enc files
+    return hrefs
+      .map(h => decodeURIComponent(h.split('/').pop()))
+      .filter(name => name.endsWith('.enc'));
+  }
+}
+
+// ── Provider factory (extensible for GitHub etc. later) ────────────────────
+function buildProvider() {
+  const cfg = loadConfig();
+  const dav = cfg.webdav || {};
+  const pass = sessionStorage.getItem('tl-sync-dav-pass');
+  if (!dav.url || !dav.username || !pass) return null;
+  return new WebDAVProvider({ url: dav.url, username: dav.username, password: pass });
+}
+
+// ── Password prompt ────────────────────────────────────────────────────────
+function promptPassword(title, msg) {
+  return new Promise(resolve => {
+    const dlg   = document.getElementById('dlg-pass');
+    const input = document.getElementById('dlg-pass-input');
+    const okBtn = document.getElementById('dlg-pass-ok');
+
+    document.getElementById('dlg-pass-title').textContent = title;
+    document.getElementById('dlg-pass-msg').textContent   = msg;
+    input.value = '';
+
+    const done = () => {
+      const v = input.value;
+      dlg.close();
+      cleanup();
+      resolve(v || null);
+    };
+    const onKey  = e => { if (e.key === 'Enter') done(); };
+    const onClose = () => { cleanup(); resolve(null); };
+    const cleanup = () => {
+      okBtn.removeEventListener('click', done);
+      input.removeEventListener('keydown', onKey);
+      dlg.removeEventListener('close', onClose);
+    };
+
+    okBtn.addEventListener('click', done);
+    input.addEventListener('keydown', onKey);
+    dlg.addEventListener('close', onClose, { once: true });
+
+    dlg.showModal();
+    setTimeout(() => input.focus(), 50);
+  });
+}
+
+async function requirePass(projectId, projectName) {
+  if (_passCache.has(projectId)) return _passCache.get(projectId);
+  const pw = await promptPassword(
+    'Projektpasswort',
+    `Passwort für „${projectName}".\n\nBleibt nur für diese Sitzung im Speicher — wird nicht gespeichert.`
+  );
+  if (!pw) return null;
+  _passCache.set(projectId, pw);
+  return pw;
+}
+
+// ── Conflict dialog ────────────────────────────────────────────────────────
+function showConflict(msg) {
+  return new Promise(resolve => {
+    const dlg    = document.getElementById('dlg-conflict');
+    const local  = document.getElementById('dlg-conflict-local');
+    const remote = document.getElementById('dlg-conflict-remote');
+
+    document.getElementById('dlg-conflict-msg').textContent = msg;
+
+    const pick = choice => { dlg.close(); cleanup(); resolve(choice); };
+    const onClose = () => { cleanup(); resolve(null); };
+    const cleanup = () => {
+      local.removeEventListener('click', onLocal);
+      remote.removeEventListener('click', onRemote);
+      dlg.removeEventListener('close', onClose);
+    };
+    const onLocal  = () => pick('local');
+    const onRemote = () => pick('remote');
+
+    local.addEventListener('click', onLocal, { once: true });
+    remote.addEventListener('click', onRemote, { once: true });
+    dlg.addEventListener('close', onClose, { once: true });
+
+    dlg.showModal();
+  });
+}
+
+// ── Discover ───────────────────────────────────────────────────────────────
+async function discoverProjects() {
+  const provider = buildProvider();
+  if (!provider) { alert('WebDAV nicht konfiguriert oder Passwort fehlt.'); return; }
+
+  const password = document.getElementById('discover-pass').value;
+  if (!password) { alert('Bitte Passwort eingeben.'); return; }
+
+  const spinner = document.getElementById('discover-spinner');
+  const results = document.getElementById('discover-results');
+  spinner.style.display = 'inline-block';
+  results.innerHTML = '';
+
+  try {
+    const files = await provider.list();
+    if (!files.length) {
+      results.innerHTML = '<p class="empty" style="margin-top:.5rem">Keine .enc-Dateien im Ordner gefunden.</p>';
+      return;
+    }
+
+    const found = [];
+    for (const filename of files) {
+      try {
+        const buffer = await provider.pull(filename);
+        if (!buffer) continue;
+        let payload;
+        try {
+          const dec = await Crypto.decrypt(buffer, password);
+          payload = JSON.parse(dec);
+        } catch {
+          continue; // wrong password or not our format
+        }
+        if (payload?.project?.id && payload?.project?.name) {
+          found.push({ filename, project: payload.project, savedAt: payload.savedAt });
+        }
+      } catch { /* skip unreadable files */ }
+    }
+
+    if (!found.length) {
+      results.innerHTML = '<p class="empty" style="margin-top:.5rem">Keine Projekte mit diesem Passwort entschlüsselbar.</p>';
+      return;
+    }
+
+    // Cache password and filename in meta so import + future push/pull work directly
+    const meta = loadMeta();
+    for (const { filename, project } of found) {
+      if (!meta[project.id]) meta[project.id] = {};
+      meta[project.id].filename = filename;
+      _passCache.set(project.id, password);
+    }
+    saveMeta(meta);
+    renderProjects();
+
+    const localIds = new Set(getProjects().map(p => p.id));
+    results.innerHTML = found.map(({ filename, project, savedAt }) => {
+      const isLocal = localIds.has(project.id);
+      const pm = meta[project.id] || {};
+
+      let badge = '';
+      let localLine = '';
+      if (isLocal) {
+        const inSync    = pm.lastPush && Math.abs(savedAt - pm.lastPush) < 10_000;
+        const neverSync = !pm.lastPush && !pm.lastPull;
+        const serverNew = !inSync && savedAt > (pm.remoteSavedAt || 0);
+
+        if (inSync) {
+          badge = '<span class="badge badge-ok">Synchron</span>';
+        } else if (neverSync) {
+          badge = '<span class="badge badge-warn">Lokal vorhanden</span>';
+        } else if (serverNew) {
+          badge = '<span class="badge badge-warn">Server neuer</span>';
+        } else {
+          badge = '<span class="badge badge-ok">Aktuell</span>';
+        }
+
+        const localTs = pm.lastPush || pm.lastPull;
+        if (localTs) localLine = `<span>Lokal: ${fmt(localTs)}</span>`;
+      }
+
+      return `
+      <div class="discover-item">
+        <div>
+          <div class="discover-name">${esc(project.name)}</div>
+          <div class="discover-meta" style="display:flex;gap:.75rem;flex-wrap:wrap">
+            <span>${project.activities?.length ?? 0} Aktivitäten</span>
+            <span>Server: ${fmt(savedAt)}</span>
+            ${localLine}
+          </div>
+        </div>
+        ${isLocal
+          ? badge
+          : `<div style="display:flex;align-items:center;gap:.375rem;flex-shrink:0">
+               <span class="badge badge-err">Nicht lokal</span>
+               <button class="btn-primary" onclick="importDiscovered('${esc(project.id)}', '${esc(filename)}')">Importieren</button>
+             </div>`
+        }
+      </div>`;
+    }).join('');
+
+  } catch (e) {
+    results.innerHTML = `<p class="empty" style="margin-top:.5rem;color:#ef4444">✗ ${esc(e.message)}</p>`;
+  } finally {
+    spinner.style.display = 'none';
+  }
+}
+
+async function importDiscovered(projectId, filename) {
+  const provider = buildProvider();
+  if (!provider) return;
+
+  const buffer = await provider.pull(filename);
+  if (!buffer) { alert('Datei nicht gefunden.'); return; }
+
+  const pw = _passCache.get(projectId);
+  if (!pw) { alert('Passwort nicht mehr im Speicher — bitte erneut suchen.'); return; }
+
+  try {
+    const dec     = await Crypto.decrypt(buffer, pw);
+    const payload = JSON.parse(dec);
+    saveProject(payload.project);
+
+    const meta = loadMeta();
+    meta[projectId] = { ...meta[projectId], lastPull: Date.now(), filename, remoteSavedAt: payload.savedAt };
+    saveMeta(meta);
+
+    renderProjects();
+    // Clear discover results for this item
+    document.getElementById('discover-results').innerHTML =
+      `<p class="empty" style="margin-top:.5rem">✓ „${esc(payload.project.name)}" importiert.</p>`;
+  } catch (e) {
+    alert(`Import fehlgeschlagen: ${e.message}`);
+  }
+}
+
+// ── Server status check ────────────────────────────────────────────────────
+async function checkAllServerStatus() {
+  const provider = buildProvider();
+  const projects = getProjects();
+  if (!provider || !projects.length) return;
+
+  projects.forEach(p => _serverStatus.set(p.id, 'checking'));
+  renderProjects();
+
+  await Promise.all(projects.map(async p => {
+    try {
+      const filename = await Crypto.fileHash(p.id);
+      const meta = loadMeta();
+      if (!meta[p.id]?.filename) {
+        meta[p.id] = { ...meta[p.id], filename };
+        saveMeta(meta);
+      }
+      _serverStatus.set(p.id, await provider.exists(filename) ? 'exists' : 'missing');
+    } catch {
+      _serverStatus.set(p.id, 'error');
+    }
+    renderProjects();
+  }));
+}
+
+// ── Push ───────────────────────────────────────────────────────────────────
+async function pushProject(projectId) {
+  const provider = buildProvider();
+  if (!provider) { alert('WebDAV nicht konfiguriert oder Passwort fehlt.'); return; }
+
+  const project = getProject(projectId);
+  if (!project) { alert('Projekt nicht gefunden.'); return; }
+
+  const pw = await requirePass(projectId, project.name);
+  if (!pw) return;
+
+  setBusy(projectId, true);
+  projLog(projectId, 'Verschlüssele…');
+  try {
+    const filename  = await Crypto.fileHash(projectId);
+    const payload   = JSON.stringify({ savedAt: Date.now(), project });
+    const encrypted = await Crypto.encrypt(payload, pw);
+
+    projLog(projectId, 'Lade hoch…');
+    await provider.push(filename, encrypted);
+
+    const meta = loadMeta();
+    meta[projectId] = { ...meta[projectId], lastPush: Date.now(), filename };
+    saveMeta(meta);
+    _serverStatus.set(projectId, 'exists');
+    renderProjects();
+    projLog(projectId, `✓ Hochgeladen — ${fmt(Date.now())}`);
+  } catch (e) {
+    projLog(projectId, `✗ ${e.message}`);
+  } finally {
+    setBusy(projectId, false);
+  }
+}
+
+// ── Pull ───────────────────────────────────────────────────────────────────
+async function pullProject(projectId) {
+  const provider = buildProvider();
+  if (!provider) { alert('WebDAV nicht konfiguriert oder Passwort fehlt.'); return; }
+
+  const project = getProject(projectId);
+  const meta    = loadMeta();
+  const pm      = meta[projectId] || {};
+
+  const pw = await requirePass(projectId, project?.name || projectId);
+  if (!pw) return;
+
+  setBusy(projectId, true);
+  projLog(projectId, 'Lade herunter…');
+  try {
+    const filename = pm.filename || (await Crypto.fileHash(projectId));
+    const buffer   = await provider.pull(filename);
+    if (!buffer) { projLog(projectId, 'Keine Datei auf dem Server gefunden.'); return; }
+
+    projLog(projectId, 'Entschlüssele…');
+    let payload;
+    try {
+      const dec = await Crypto.decrypt(buffer, pw);
+      payload = JSON.parse(dec);
+    } catch {
+      forgetKey(projectId);
+      projLog(projectId, '✗ Falsches Passwort.');
+      return;
+    }
+
+    const remoteProject = payload.project;
+    const remoteSavedAt = payload.savedAt;
+
+    // Conflict detection: remote changed since our last pull?
+    if (pm.lastPull && remoteSavedAt > pm.lastPull) {
+      const localPushed = pm.lastPush || 0;
+      if (localPushed > pm.lastPull) {
+        // Both sides have changes since last pull
+        const choice = await showConflict(
+          `Lokal gibt es Änderungen seit dem letzten Pull.\n` +
+          `Remote-Stand: ${fmt(remoteSavedAt)}\n` +
+          `Letzter lokaler Push: ${fmt(localPushed)}\n\n` +
+          `Was soll behalten werden?`
+        );
+        if (!choice || choice === 'local') {
+          projLog(projectId, 'Pull abgebrochen — lokaler Stand behalten.');
+          return;
+        }
+      }
+    }
+
+    saveProject(remoteProject);
+    meta[projectId] = { ...pm, lastPull: Date.now(), filename, remoteSavedAt };
+    saveMeta(meta);
+    renderProjects();
+    projLog(projectId, `✓ Abgerufen — ${fmt(Date.now())}`);
+  } catch (e) {
+    projLog(projectId, `✗ ${e.message}`);
+  } finally {
+    setBusy(projectId, false);
+  }
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function setBusy(projectId, busy) {
+  const card = document.querySelector(`[data-proj-id="${projectId}"]`);
+  if (!card) return;
+  card.querySelectorAll('button').forEach(b => b.disabled = busy);
+  const sp = card.querySelector('.spinner');
+  if (sp) sp.style.display = busy ? 'inline-block' : 'none';
+}
+
+function projLog(projectId, msg) {
+  const el = document.getElementById(`proj-log-${projectId}`);
+  if (el) el.textContent = msg;
+}
+
+function fmt(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderProjects() {
+  const projects = getProjects();
+  const meta     = loadMeta();
+  const list     = document.getElementById('project-list');
+  const hasProvider = !!buildProvider();
+
+  if (!projects.length) {
+    list.innerHTML = '<p class="empty">Keine Projekte in der Timeline-App gefunden.</p>';
+    return;
+  }
+
+  list.innerHTML = projects.map(p => {
+    const pm      = meta[p.id] || {};
+    const status  = _serverStatus.get(p.id);
+    const canPull = status === 'exists';
+
+    const serverBadge = !hasProvider ? '' : {
+      checking: '<span class="badge badge-warn">Prüfe…</span>',
+      exists:   '<span class="badge badge-ok">Server ✓</span>',
+      missing:  '<span class="badge badge-err">Nicht auf Server</span>',
+      error:    '<span class="badge badge-err">Fehler</span>',
+    }[status] ?? '';
+
+    const timestamps = (pm.lastPush || pm.lastPull)
+      ? `Push: ${fmt(pm.lastPush)} · Pull: ${fmt(pm.lastPull)}`
+      : 'Noch nicht synchronisiert';
+
+    return `
+      <div class="proj-card" data-proj-id="${esc(p.id)}">
+        <div class="proj-header">
+          <span class="proj-name">${esc(p.name)}</span>
+          <span style="display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;justify-content:flex-end">
+            ${serverBadge}
+            <span class="spinner"></span>
+          </span>
+        </div>
+        <div class="proj-meta">
+          ${p.activities?.length ?? 0} Aktivitäten · ${p.milestones?.length ?? 0} Meilensteine · ${timestamps}
+        </div>
+        <div class="btn-row" style="margin-top:.625rem">
+          <button class="btn-primary" onclick="pushProject('${esc(p.id)}')">↑ Push</button>
+          ${canPull ? `<button class="btn-ghost" onclick="pullProject('${esc(p.id)}')">↓ Pull</button>` : ''}
+        </div>
+        <div class="proj-log" id="proj-log-${esc(p.id)}"></div>
+      </div>`;
+  }).join('');
+}
+
+// ── Setup ──────────────────────────────────────────────────────────────────
+function loadSetup() {
+  const cfg = loadConfig();
+  const dav = cfg.webdav || {};
+
+  // Migrate: password previously saved to localStorage → move to sessionStorage once
+  if (dav.savePass && dav.password && !sessionStorage.getItem('tl-sync-dav-pass')) {
+    sessionStorage.setItem('tl-sync-dav-pass', dav.password);
+    delete cfg.webdav.password;
+    delete cfg.webdav.savePass;
+    saveConfig(cfg);
+  }
+
+  document.getElementById('dav-url').value  = dav.url      || '';
+  document.getElementById('dav-user').value = dav.username || '';
+
+  const hasPass = !!sessionStorage.getItem('tl-sync-dav-pass');
+  document.getElementById('dav-pass-input-section').style.display  = hasPass ? 'none' : '';
+  document.getElementById('dav-pass-stored-section').style.display = hasPass ? '' : 'none';
+}
+
+function saveSetup() {
+  const url      = document.getElementById('dav-url').value.trim();
+  const username = document.getElementById('dav-user').value.trim();
+  const password = document.getElementById('dav-pass').value;
+
+  const cfg = loadConfig();
+  cfg.webdav = { url, username };
+  if (password) sessionStorage.setItem('tl-sync-dav-pass', password);
+  saveConfig(cfg);
+  updateSetupSummary();
+}
+
+function clearDavPass() {
+  sessionStorage.removeItem('tl-sync-dav-pass');
+  document.getElementById('dav-pass').value = '';
+  loadSetup();
+  updateSetupSummary();
+  renderProjects();
+}
+
+function removeConnection() {
+  sessionStorage.removeItem('tl-sync-dav-pass');
+  const cfg = loadConfig();
+  delete cfg.webdav;
+  saveConfig(cfg);
+  document.getElementById('dav-pass').value = '';
+  loadSetup();
+  updateSetupSummary();
+  renderProjects();
+}
+
+async function testConnection() {
+  saveSetup();
+  const provider  = buildProvider();
+  const statusEl  = document.getElementById('conn-status');
+  if (!provider) {
+    statusEl.innerHTML = '<span class="badge badge-err">Zugangsdaten unvollständig</span>';
+    return;
+  }
+  statusEl.innerHTML = '<span class="spinner" style="display:inline-block"></span>';
+  try {
+    const ok = await provider.test();
+    if (ok) {
+      statusEl.innerHTML = '<span class="badge badge-ok">Verbunden ✓</span>';
+      setTimeout(() => { loadSetup(); checkAllServerStatus(); }, 800);
+    } else {
+      statusEl.innerHTML = '<span class="badge badge-err">Verbindung fehlgeschlagen</span>';
+    }
+  } catch (e) {
+    statusEl.innerHTML = `<span class="badge badge-err">${esc(e.message)}</span>`;
+  }
+}
+
+// ── Setup collapse ─────────────────────────────────────────────────────────
+function toggleSetup() {
+  const body    = document.getElementById('setup-body');
+  const toggle  = document.getElementById('setup-toggle');
+  const hidden  = body.classList.toggle('hidden');
+  toggle.textContent = hidden ? '▸' : '▾';
+}
+
+function updateSetupSummary() {
+  const url     = document.getElementById('dav-url').value.trim();
+  const summary = document.getElementById('setup-summary');
+  summary.textContent = url ? new URL(url).hostname : '';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadSetup();
+updateSetupSummary();
+if (document.getElementById('dav-url').value) {
+  document.getElementById('setup-body').classList.add('hidden');
+  document.getElementById('setup-toggle').textContent = '▸';
+}
+renderProjects();
+checkAllServerStatus();
+</script>
+</body>
+</html>
