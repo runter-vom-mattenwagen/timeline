@@ -227,6 +227,19 @@
     dialog .field { margin-top: 0.75rem; }
 
     .empty { font-size: 0.875rem; color: var(--text-muted); }
+
+    .discover-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.625rem 0;
+      border-top: 1px solid var(--border);
+      gap: 1rem;
+    }
+    .discover-item:first-child { border-top: none; }
+    .discover-name { font-weight: 600; font-size: 0.9375rem; }
+    .discover-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+    #discover-results { margin-top: 0.75rem; }
   </style>
 </head>
 <body>
@@ -284,6 +297,23 @@
   <div id="project-list"></div>
 </div>
 
+<!-- ── Discover ──────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-title">Vom Server laden</div>
+  <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem;line-height:1.5">
+    Sucht alle verschlüsselten Dateien im WebDAV-Ordner und versucht sie mit dem eingegebenen Passwort zu entschlüsseln.
+  </p>
+  <div class="field">
+    <label>Passwort</label>
+    <input type="password" id="discover-pass" autocomplete="off" placeholder="Projektpasswort eingeben">
+  </div>
+  <div class="btn-row">
+    <button class="btn-ghost" onclick="discoverProjects()">Suchen</button>
+    <span class="spinner" id="discover-spinner"></span>
+  </div>
+  <div id="discover-results"></div>
+</div>
+
 <!-- ── Password dialog ──────────────────────────────────────── -->
 <dialog id="dlg-pass">
   <h3 id="dlg-pass-title">Projektpasswort</h3>
@@ -317,13 +347,15 @@ const LS_CONFIG = 'timeline-sync-config';
 const LS_META   = 'timeline-sync-meta';
 const LS_DATA   = 'timeline-viz-data';
 
-// ── In-memory key cache (never written to storage) ─────────────────────────
-// Map<projectId, CryptoKey>
-const _keyCache = new Map();
+// ── In-memory password cache (never written to storage) ────────────────────
+// Map<projectId, string>  — password string, cleared on forgetKey()
+const _passCache = new Map();
 
 // ── Crypto ─────────────────────────────────────────────────────────────────
+// File format: pbkdf2_salt(16) || aes_iv(12) || ciphertext
+// Salt is embedded so any file can be decrypted with only the password.
 const Crypto = {
-  async deriveKey(password, salt) {
+  async _deriveKey(password, salt) {
     const raw = await crypto.subtle.importKey(
       'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
     );
@@ -331,33 +363,37 @@ const Crypto = {
       { name: 'PBKDF2', salt, iterations: 200_000, hash: 'SHA-256' },
       raw,
       { name: 'AES-GCM', length: 256 },
-      false,          // non-exportable
+      false,
       ['encrypt', 'decrypt']
     );
   },
 
-  async encrypt(plaintext, key) {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = await crypto.subtle.encrypt(
+  async encrypt(plaintext, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await this._deriveKey(password, salt);
+    const ct   = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)
     );
-    // Layout: iv(12) || ciphertext
-    const out = new Uint8Array(12 + ct.byteLength);
-    out.set(iv, 0);
-    out.set(new Uint8Array(ct), 12);
+    // Layout: salt(16) || iv(12) || ciphertext
+    const out = new Uint8Array(16 + 12 + ct.byteLength);
+    out.set(salt, 0);
+    out.set(iv, 16);
+    out.set(new Uint8Array(ct), 28);
     return out;
   },
 
-  async decrypt(buffer, key) {
-    const b  = new Uint8Array(buffer);
-    const iv = b.slice(0, 12);
-    const ct = b.slice(12);
-    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  async decrypt(buffer, password) {
+    const b    = new Uint8Array(buffer);
+    const salt = b.slice(0, 16);
+    const iv   = b.slice(16, 28);
+    const ct   = b.slice(28);
+    const key  = await this._deriveKey(password, salt);
+    const pt   = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
     return new TextDecoder().decode(pt);
   },
 
-  // Derive a stable filename from projectId (no password involved — just for
-  // obfuscation of the UUID on the WebDAV folder listing).
+  // Derive a stable filename from projectId (no password involved).
   async fileHash(projectId) {
     const data = new TextEncoder().encode('tl-sync:' + projectId);
     const hash = await crypto.subtle.digest('SHA-256', data);
@@ -369,30 +405,9 @@ const Crypto = {
   }
 };
 
-// ── Key management ─────────────────────────────────────────────────────────
-// Salt is stored in sync-meta per project so the same password always
-// produces the same key for a given project.
-async function getKey(projectId, password) {
-  if (_keyCache.has(projectId)) return _keyCache.get(projectId);
-
-  const meta = loadMeta();
-  let saltHex = meta[projectId]?.keySalt;
-  if (!saltHex) {
-    // First time: generate & persist salt
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    saltHex = Array.from(salt).map(b => b.toString(16).padStart(2,'0')).join('');
-    meta[projectId] = { ...meta[projectId], keySalt: saltHex };
-    saveMeta(meta);
-  }
-  const salt = new Uint8Array(saltHex.match(/.{2}/g).map(h => parseInt(h, 16)));
-  const key  = await Crypto.deriveKey(password, salt);
-  _keyCache.set(projectId, key);
-  return key;
-  // password string is now out of scope and eligible for GC
-}
-
+// ── Password cache management ───────────────────────────────────────────────
 function forgetKey(projectId) {
-  _keyCache.delete(projectId);
+  _passCache.delete(projectId);
 }
 
 // ── Storage helpers ────────────────────────────────────────────────────────
@@ -457,6 +472,22 @@ class WebDAVProvider {
     if (!r.ok) throw new Error(`GET ${r.status} ${r.statusText}`);
     return r.arrayBuffer();
   }
+
+  async list() {
+    const r = await fetch(this.base, {
+      method: 'PROPFIND',
+      headers: this._h({ 'Depth': '1', 'Content-Type': 'application/xml' }),
+      body: `<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:displayname/></d:prop></d:propfind>`
+    });
+    if (!r.ok && r.status !== 207) throw new Error(`PROPFIND ${r.status} ${r.statusText}`);
+    const xml  = await r.text();
+    const doc  = new DOMParser().parseFromString(xml, 'application/xml');
+    const hrefs = [...doc.querySelectorAll('response href')].map(el => el.textContent.trim());
+    // Extract just the filename from each href, keep only .enc files
+    return hrefs
+      .map(h => decodeURIComponent(h.split('/').pop()))
+      .filter(name => name.endsWith('.enc'));
+  }
 }
 
 // ── Provider factory (extensible for GitHub etc. later) ────────────────────
@@ -502,14 +533,15 @@ function promptPassword(title, msg) {
   });
 }
 
-async function requireKey(projectId, projectName) {
-  if (_keyCache.has(projectId)) return _keyCache.get(projectId);
+async function requirePass(projectId, projectName) {
+  if (_passCache.has(projectId)) return _passCache.get(projectId);
   const pw = await promptPassword(
     'Projektpasswort',
     `Passwort für „${projectName}".\n\nBleibt nur für diese Sitzung im Speicher — wird nicht gespeichert.`
   );
   if (!pw) return null;
-  return getKey(projectId, pw);
+  _passCache.set(projectId, pw);
+  return pw;
 }
 
 // ── Conflict dialog ────────────────────────────────────────────────────────
@@ -539,6 +571,108 @@ function showConflict(msg) {
   });
 }
 
+// ── Discover ───────────────────────────────────────────────────────────────
+async function discoverProjects() {
+  const provider = buildProvider();
+  if (!provider) { alert('WebDAV nicht konfiguriert oder Passwort fehlt.'); return; }
+
+  const password = document.getElementById('discover-pass').value;
+  if (!password) { alert('Bitte Passwort eingeben.'); return; }
+
+  const spinner = document.getElementById('discover-spinner');
+  const results = document.getElementById('discover-results');
+  spinner.style.display = 'inline-block';
+  results.innerHTML = '';
+
+  try {
+    const files = await provider.list();
+    if (!files.length) {
+      results.innerHTML = '<p class="empty" style="margin-top:.5rem">Keine .enc-Dateien im Ordner gefunden.</p>';
+      return;
+    }
+
+    const found = [];
+    for (const filename of files) {
+      try {
+        const buffer = await provider.pull(filename);
+        if (!buffer) continue;
+        let payload;
+        try {
+          const dec = await Crypto.decrypt(buffer, password);
+          payload = JSON.parse(dec);
+        } catch {
+          continue; // wrong password or not our format
+        }
+        if (payload?.project?.id && payload?.project?.name) {
+          found.push({ filename, project: payload.project, savedAt: payload.savedAt });
+        }
+      } catch { /* skip unreadable files */ }
+    }
+
+    if (!found.length) {
+      results.innerHTML = '<p class="empty" style="margin-top:.5rem">Keine Projekte mit diesem Passwort entschlüsselbar.</p>';
+      return;
+    }
+
+    results.innerHTML = found.map(({ filename, project, savedAt }) => `
+      <div class="discover-item">
+        <div>
+          <div class="discover-name">${esc(project.name)}</div>
+          <div class="discover-meta">
+            ${project.activities?.length ?? 0} Aktivitäten · gespeichert ${fmt(savedAt)}
+          </div>
+        </div>
+        <button class="btn-primary"
+          onclick="importDiscovered('${esc(project.id)}', '${esc(filename)}')">
+          Importieren
+        </button>
+      </div>`).join('');
+
+    // Cache password and filename in meta so import + future push/pull work directly
+    const meta = loadMeta();
+    for (const { filename, project } of found) {
+      if (!meta[project.id]) meta[project.id] = {};
+      meta[project.id].filename = filename;
+      _passCache.set(project.id, password);
+    }
+    saveMeta(meta);
+    renderProjects();
+
+  } catch (e) {
+    results.innerHTML = `<p class="empty" style="margin-top:.5rem;color:#ef4444">✗ ${esc(e.message)}</p>`;
+  } finally {
+    spinner.style.display = 'none';
+  }
+}
+
+async function importDiscovered(projectId, filename) {
+  const provider = buildProvider();
+  if (!provider) return;
+
+  const buffer = await provider.pull(filename);
+  if (!buffer) { alert('Datei nicht gefunden.'); return; }
+
+  const pw = _passCache.get(projectId);
+  if (!pw) { alert('Passwort nicht mehr im Speicher — bitte erneut suchen.'); return; }
+
+  try {
+    const dec     = await Crypto.decrypt(buffer, pw);
+    const payload = JSON.parse(dec);
+    saveProject(payload.project);
+
+    const meta = loadMeta();
+    meta[projectId] = { ...meta[projectId], lastPull: Date.now(), filename, remoteSavedAt: payload.savedAt };
+    saveMeta(meta);
+
+    renderProjects();
+    // Clear discover results for this item
+    document.getElementById('discover-results').innerHTML =
+      `<p class="empty" style="margin-top:.5rem">✓ „${esc(payload.project.name)}" importiert.</p>`;
+  } catch (e) {
+    alert(`Import fehlgeschlagen: ${e.message}`);
+  }
+}
+
 // ── Push ───────────────────────────────────────────────────────────────────
 async function pushProject(projectId) {
   const provider = buildProvider();
@@ -547,15 +681,15 @@ async function pushProject(projectId) {
   const project = getProject(projectId);
   if (!project) { alert('Projekt nicht gefunden.'); return; }
 
-  const key = await requireKey(projectId, project.name);
-  if (!key) return;
+  const pw = await requirePass(projectId, project.name);
+  if (!pw) return;
 
   setBusy(projectId, true);
   projLog(projectId, 'Verschlüssele…');
   try {
     const filename  = await Crypto.fileHash(projectId);
     const payload   = JSON.stringify({ savedAt: Date.now(), project });
-    const encrypted = await Crypto.encrypt(payload, key);
+    const encrypted = await Crypto.encrypt(payload, pw);
 
     projLog(projectId, 'Lade hoch…');
     await provider.push(filename, encrypted);
@@ -581,8 +715,8 @@ async function pullProject(projectId) {
   const meta    = loadMeta();
   const pm      = meta[projectId] || {};
 
-  const key = await requireKey(projectId, project?.name || projectId);
-  if (!key) return;
+  const pw = await requirePass(projectId, project?.name || projectId);
+  if (!pw) return;
 
   setBusy(projectId, true);
   projLog(projectId, 'Lade herunter…');
@@ -594,10 +728,9 @@ async function pullProject(projectId) {
     projLog(projectId, 'Entschlüssele…');
     let payload;
     try {
-      const dec = await Crypto.decrypt(buffer, key);
+      const dec = await Crypto.decrypt(buffer, pw);
       payload = JSON.parse(dec);
     } catch {
-      // Wrong password — evict cached key so user can retry
       forgetKey(projectId);
       projLog(projectId, '✗ Falsches Passwort.');
       return;
@@ -673,9 +806,9 @@ function renderProjects() {
 
   list.innerHTML = projects.map(p => {
     const pm      = meta[p.id] || {};
-    const cached  = _keyCache.has(p.id);
+    const cached  = _passCache.has(p.id);
     const keyBadge = cached
-      ? '<span class="badge badge-ok">Schlüssel aktiv</span>'
+      ? '<span class="badge badge-ok">Passwort aktiv</span>'
       : '<span class="badge badge-warn">Passwort nötig</span>';
     return `
       <div class="proj-card" data-proj-id="${esc(p.id)}">
