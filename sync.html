@@ -378,9 +378,9 @@ const LS_CONFIG = 'timeline-sync-config';
 const LS_META   = 'timeline-sync-meta';
 const LS_DATA   = 'timeline-viz-data';
 
-// ── In-memory password cache (never written to storage) ────────────────────
-// Map<projectId, string>  — password string, cleared on forgetKey()
-const _passCache = new Map();
+// ── In-memory caches (never written to storage) ────────────────────────────
+const _passCache    = new Map(); // Map<projectId, string>
+const _serverStatus = new Map(); // Map<projectId, 'checking'|'exists'|'missing'|'error'>
 
 // ── Crypto ─────────────────────────────────────────────────────────────────
 // File format: pbkdf2_salt(16) || aes_iv(12) || ciphertext
@@ -502,6 +502,14 @@ class WebDAVProvider {
     if (r.status === 404) return null;
     if (!r.ok) throw new Error(`GET ${r.status} ${r.statusText}`);
     return r.arrayBuffer();
+  }
+
+  async exists(filename) {
+    const r = await fetch(this.base + filename, {
+      method: 'PROPFIND',
+      headers: this._h({ 'Depth': '0' })
+    });
+    return r.ok || r.status === 207;
   }
 
   async list() {
@@ -706,6 +714,31 @@ async function importDiscovered(projectId, filename) {
   }
 }
 
+// ── Server status check ────────────────────────────────────────────────────
+async function checkAllServerStatus() {
+  const provider = buildProvider();
+  const projects = getProjects();
+  if (!provider || !projects.length) return;
+
+  projects.forEach(p => _serverStatus.set(p.id, 'checking'));
+  renderProjects();
+
+  await Promise.all(projects.map(async p => {
+    try {
+      const filename = await Crypto.fileHash(p.id);
+      const meta = loadMeta();
+      if (!meta[p.id]?.filename) {
+        meta[p.id] = { ...meta[p.id], filename };
+        saveMeta(meta);
+      }
+      _serverStatus.set(p.id, await provider.exists(filename) ? 'exists' : 'missing');
+    } catch {
+      _serverStatus.set(p.id, 'error');
+    }
+    renderProjects();
+  }));
+}
+
 // ── Push ───────────────────────────────────────────────────────────────────
 async function pushProject(projectId) {
   const provider = buildProvider();
@@ -730,6 +763,7 @@ async function pushProject(projectId) {
     const meta = loadMeta();
     meta[projectId] = { ...meta[projectId], lastPush: Date.now(), filename };
     saveMeta(meta);
+    _serverStatus.set(projectId, 'exists');
     renderProjects();
     projLog(projectId, `✓ Hochgeladen — ${fmt(Date.now())}`);
   } catch (e) {
@@ -831,6 +865,7 @@ function renderProjects() {
   const projects = getProjects();
   const meta     = loadMeta();
   const list     = document.getElementById('project-list');
+  const hasProvider = !!buildProvider();
 
   if (!projects.length) {
     list.innerHTML = '<p class="empty">Keine Projekte in der Timeline-App gefunden.</p>';
@@ -840,25 +875,36 @@ function renderProjects() {
   list.innerHTML = projects.map(p => {
     const pm      = meta[p.id] || {};
     const cached  = _passCache.has(p.id);
-    const keyBadge = cached
-      ? '<span class="badge badge-ok">Passwort aktiv</span>'
-      : '<span class="badge badge-warn">Passwort nötig</span>';
+    const status  = _serverStatus.get(p.id);
+    const canPull = status === 'exists';
+
+    const serverBadge = !hasProvider ? '' : {
+      checking: '<span class="badge badge-warn">Prüfe…</span>',
+      exists:   '<span class="badge badge-ok">Server ✓</span>',
+      missing:  '<span class="badge badge-err">Nicht auf Server</span>',
+      error:    '<span class="badge badge-err">Fehler</span>',
+    }[status] ?? '';
+
+    const passBadge = cached ? '<span class="badge badge-ok">Passwort aktiv</span>' : '';
+
     return `
       <div class="proj-card" data-proj-id="${esc(p.id)}">
         <div class="proj-header">
           <span class="proj-name">${esc(p.name)}</span>
-          <span style="display:flex;align-items:center;gap:.5rem">
-            ${keyBadge}
+          <span style="display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;justify-content:flex-end">
+            ${serverBadge}${passBadge}
             <span class="spinner"></span>
           </span>
         </div>
         <div class="proj-meta">
-          ${p.activities?.length ?? 0} Aktivitäten · ${p.milestones?.length ?? 0} Meilensteine<br>
-          Push: ${fmt(pm.lastPush)} · Pull: ${fmt(pm.lastPull)}
+          ${p.activities?.length ?? 0} Aktivitäten · ${p.milestones?.length ?? 0} Meilensteine
+        </div>
+        <div class="proj-meta" style="margin-top:.15rem">
+          Letzter Push: ${fmt(pm.lastPush)} · Letzter Pull: ${fmt(pm.lastPull)}
         </div>
         <div class="btn-row" style="margin-top:.625rem">
           <button class="btn-primary" onclick="pushProject('${esc(p.id)}')">↑ Push</button>
-          <button class="btn-ghost"   onclick="pullProject('${esc(p.id)}')">↓ Pull</button>
+          ${canPull ? `<button class="btn-ghost" onclick="pullProject('${esc(p.id)}')">↓ Pull</button>` : ''}
           ${cached ? `<button class="btn-ghost" onclick="forgetKey('${esc(p.id)}');renderProjects()">Passwort neu eingeben</button>` : ''}
         </div>
         <div class="proj-log" id="proj-log-${esc(p.id)}"></div>
@@ -939,12 +985,12 @@ function updateSetupSummary() {
 // ── Init ───────────────────────────────────────────────────────────────────
 loadSetup();
 updateSetupSummary();
-// Auto-collapse if already configured
 if (document.getElementById('dav-url').value) {
   document.getElementById('setup-body').classList.add('hidden');
   document.getElementById('setup-toggle').textContent = '▸';
 }
 renderProjects();
+checkAllServerStatus();
 </script>
 </body>
 </html>
