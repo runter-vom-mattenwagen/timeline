@@ -409,20 +409,22 @@ function saveMeta(m) { localStorage.setItem(LS_META, JSON.stringify(m)); }
 function getProjects() {
   try {
     const d = JSON.parse(localStorage.getItem(LS_DATA) || '{}');
-    return Object.values(d.projects || {});
+    return d.projects || [];
   } catch { return []; }
 }
 function getProject(id) {
   try {
     const d = JSON.parse(localStorage.getItem(LS_DATA) || '{}');
-    return (d.projects || {})[id] ?? null;
+    return (d.projects || []).find(p => p.id === id) ?? null;
   } catch { return null; }
 }
 function saveProject(project) {
   const raw = localStorage.getItem(LS_DATA);
-  const d   = raw ? JSON.parse(raw) : {};
-  if (!d.projects) d.projects = {};
-  d.projects[project.id] = project;
+  const d   = raw ? JSON.parse(raw) : { projects: [] };
+  if (!d.projects) d.projects = [];
+  const idx = d.projects.findIndex(p => p.id === project.id);
+  if (idx >= 0) d.projects[idx] = project;
+  else d.projects.push(project);
   localStorage.setItem(LS_DATA, JSON.stringify(d));
 }
 
