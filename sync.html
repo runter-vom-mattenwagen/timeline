@@ -280,7 +280,7 @@
 
 <!-- ── WebDAV Setup ─────────────────────────────────────────── -->
 <div class="card" id="setup-card">
-  <div class="card-header" onclick="toggleSetup()">
+  <div class="card-header" onclick="toggleSection('setup')">
     <div class="card-title">WebDAV Endpoint</div>
     <span class="card-summary" id="setup-summary"></span>
     <span class="card-toggle" id="setup-toggle">▾</span>
@@ -296,7 +296,7 @@
           Der WebDAV-Server muss CORS erlauben. nginx-Config:<br><br>
           <code>add_header Access-Control-Allow-Origin $http_origin always;</code><br>
           <code>add_header Access-Control-Allow-Credentials "true" always;</code><br>
-          <code>add_header Access-Control-Allow-Methods "GET, PUT, PROPFIND, OPTIONS" always;</code><br>
+          <code>add_header Access-Control-Allow-Methods "GET, PUT, DELETE, PROPFIND, OPTIONS" always;</code><br>
           <code>add_header Access-Control-Allow-Headers "Authorization, Content-Type, Depth" always;</code><br><br>
           Preflight (OPTIONS) separat mit <code>return 204</code> beantworten.
         </span>
@@ -333,6 +333,28 @@
   </div><!-- /.card-body -->
 </div>
 
+<!-- ── Discover ──────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header" onclick="toggleSection('discover')">
+    <div class="card-title">Server durchsuchen</div>
+    <span class="card-toggle" id="discover-toggle">▸</span>
+  </div>
+  <div class="card-body hidden" id="discover-body">
+    <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem;line-height:1.5">
+      Sucht alle verschlüsselten Dateien im WebDAV-Ordner. Bereits vorhandene Projekte werden angezeigt, noch nicht importierte können geladen werden.
+    </p>
+    <div class="field">
+      <label>Projektpasswort <span style="font-weight:400;color:var(--text-muted)">(Verschlüsselung)</span></label>
+      <input type="password" id="discover-pass" autocomplete="off" placeholder="Dasselbe Passwort wie beim Push/Pull" onkeydown="if(event.key==='Enter') discoverProjects()">
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="discoverProjects()">Suchen</button>
+      <span class="spinner" id="discover-spinner"></span>
+    </div>
+    <div id="discover-results"></div>
+  </div>
+</div>
+
 <!-- ── Projects ─────────────────────────────────────────────── -->
 <div class="card">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
@@ -340,23 +362,6 @@
     <button class="btn-ghost" style="padding:.2rem .5rem;font-size:.95rem" onclick="checkAllServerStatus()" title="Server-Status neu prüfen">⟳</button>
   </div>
   <div id="project-list"></div>
-</div>
-
-<!-- ── Discover ──────────────────────────────────────────────── -->
-<div class="card">
-  <div class="card-title">Vom Server laden</div>
-  <p style="font-size:.875rem;color:var(--text-muted);margin-bottom:1rem;line-height:1.5">
-    Sucht alle verschlüsselten Dateien im WebDAV-Ordner. Bereits vorhandene Projekte werden angezeigt, noch nicht importierte können geladen werden.
-  </p>
-  <div class="field">
-    <label>Projektpasswort <span style="font-weight:400;color:var(--text-muted)">(Verschlüsselung)</span></label>
-    <input type="password" id="discover-pass" autocomplete="off" placeholder="Dasselbe Passwort wie beim Push/Pull" onkeydown="if(event.key==='Enter') discoverProjects()">
-  </div>
-  <div class="btn-row">
-    <button class="btn-ghost" onclick="discoverProjects()">Suchen</button>
-    <span class="spinner" id="discover-spinner"></span>
-  </div>
-  <div id="discover-results"></div>
 </div>
 
 <!-- ── Password dialog ──────────────────────────────────────── -->
@@ -516,6 +521,14 @@ class WebDAVProvider {
     if (r.status === 404) return null;
     if (!r.ok) throw new Error(`GET ${r.status} ${r.statusText}`);
     return r.arrayBuffer();
+  }
+
+  async delete(filename) {
+    const r = await fetch(this.base + filename, {
+      method: 'DELETE',
+      headers: this._h()
+    });
+    if (!r.ok) throw new Error(`DELETE ${r.status} ${r.statusText}`);
   }
 
   async exists(filename) {
@@ -819,6 +832,33 @@ async function pushProject(projectId) {
   }
 }
 
+// ── Delete from server ─────────────────────────────────────────────────────
+async function deleteFromServer(projectId) {
+  const provider = buildProvider();
+  if (!provider) { alert('WebDAV nicht konfiguriert oder Passwort fehlt.'); return; }
+
+  const meta = loadMeta();
+  const filename = meta[projectId]?.filename;
+  if (!filename) { alert('Dateiname unbekannt.'); return; }
+
+  const project = getProject(projectId);
+  const name = project?.name || projectId;
+  if (!confirm(`„${name}" vom Server löschen?\n\n${filename}\n\nLokal bleibt das Projekt erhalten.`)) return;
+
+  setBusy(projectId, true);
+  projLog(projectId, 'Lösche…');
+  try {
+    await provider.delete(filename);
+    _serverStatus.set(projectId, 'missing');
+    renderProjects();
+    projLog(projectId, `✓ Vom Server gelöscht — ${fmt(Date.now())}`);
+  } catch (e) {
+    projLog(projectId, `✗ ${e.message}`);
+  } finally {
+    setBusy(projectId, false);
+  }
+}
+
 // ── Pull ───────────────────────────────────────────────────────────────────
 async function pullProject(projectId) {
   const provider = buildProvider();
@@ -930,9 +970,16 @@ function renderProjects() {
       error:    '<span class="badge badge-err">Fehler</span>',
     }[status] ?? '';
 
+    const counts     = `${p.activities?.length ?? 0} Aktivitäten · ${p.milestones?.length ?? 0} Meilensteine`;
     const timestamps = (pm.lastPush || pm.lastPull)
       ? `Push: ${fmt(pm.lastPush)} · Pull: ${fmt(pm.lastPull)}`
       : 'Noch nicht synchronisiert';
+    const filenameTooltip = (status === 'exists' && pm.filename)
+      ? `<span class="has-tooltip" style="margin-left:.375rem">
+           <span class="tooltip-icon">ⓘ</span>
+           <span class="tooltip-box">Dateiname auf dem Server:<br><code>${esc(pm.filename)}</code></span>
+         </span>`
+      : '';
 
     return `
       <div class="proj-card" data-proj-id="${esc(p.id)}">
@@ -943,12 +990,13 @@ function renderProjects() {
             <span class="spinner"></span>
           </span>
         </div>
-        <div class="proj-meta">
-          ${p.activities?.length ?? 0} Aktivitäten · ${p.milestones?.length ?? 0} Meilensteine · ${timestamps}
+        <div class="proj-meta" style="display:flex;align-items:center;flex-wrap:wrap;gap:.25rem">
+          ${counts} · ${timestamps}${filenameTooltip}
         </div>
         <div class="btn-row" style="margin-top:.625rem">
           <button class="btn-primary" onclick="pushProject('${esc(p.id)}')">↑ Push</button>
           ${canPull ? `<button class="btn-ghost" onclick="pullProject('${esc(p.id)}')">↓ Pull</button>` : ''}
+          ${canPull ? `<button class="btn-danger" style="margin-left:auto" onclick="deleteFromServer('${esc(p.id)}')" title="Datei vom Server löschen (lokal bleibt erhalten)">× Server</button>` : ''}
         </div>
         <div class="proj-log" id="proj-log-${esc(p.id)}"></div>
       </div>`;
@@ -1029,11 +1077,11 @@ async function testConnection() {
   }
 }
 
-// ── Setup collapse ─────────────────────────────────────────────────────────
-function toggleSetup() {
-  const body    = document.getElementById('setup-body');
-  const toggle  = document.getElementById('setup-toggle');
-  const hidden  = body.classList.toggle('hidden');
+// ── Collapse toggles ───────────────────────────────────────────────────────
+function toggleSection(prefix) {
+  const body   = document.getElementById(prefix + '-body');
+  const toggle = document.getElementById(prefix + '-toggle');
+  const hidden = body.classList.toggle('hidden');
   toggle.textContent = hidden ? '▸' : '▾';
 }
 
@@ -1044,6 +1092,20 @@ function updateSetupSummary() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
+function initFilenames() {
+  const projects = getProjects();
+  if (!projects.length) return;
+  const meta = loadMeta();
+  const pending = projects.filter(p => !meta[p.id]?.filename);
+  if (!pending.length) return;
+  Promise.all(pending.map(p => Crypto.fileHash(p.id).then(fn => ({ id: p.id, fn }))))
+    .then(results => {
+      results.forEach(({ id, fn }) => { meta[id] = { ...meta[id], filename: fn }; });
+      saveMeta(meta);
+      renderProjects();
+    });
+}
+
 loadSetup();
 updateSetupSummary();
 if (document.getElementById('dav-url').value) {
@@ -1051,6 +1113,7 @@ if (document.getElementById('dav-url').value) {
   document.getElementById('setup-toggle').textContent = '▸';
 }
 renderProjects();
+initFilenames();
 checkAllServerStatus();
 </script>
 </body>
