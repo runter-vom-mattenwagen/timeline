@@ -725,6 +725,9 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
   const [copiedKey, setCopiedKey] = useState(null);
   const copyTo = (key, text) => { navigator.clipboard.writeText(text).then(() => { setCopiedKey(key); setTimeout(() => setCopiedKey(null), 2000); }); };
 
+  const [collapsedLanes, setCollapsedLanes] = React.useState(new Set());
+  const toggleLane = (id) => setCollapsedLanes(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+
   function buildTSV() {
     const headers = ['Gruppe', 'Aktivität', 'Start', 'Ende', 'Dauer (Tage)', 'Notiz', ...otherDims.map(d => d.name)];
     const rows = [headers];
@@ -774,6 +777,7 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
         </div>
         {(() => {
           const colCount = 5 + otherDims.length;
+          const allCollapsed = allLanes.length > 0 && allLanes.every(l => collapsedLanes.has(l.item.id));
           const tdBase = { padding: '7px 10px', borderBottom: '1px solid var(--border-light)', fontSize: 13, verticalAlign: 'middle' };
           const thBase = { padding: '5px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textAlign: 'left', borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap' };
           const laneHd = (idx) => ({ padding: `${idx > 0 ? 18 : 10}px 10px 4px`, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', ...(idx > 0 ? { borderTop: '2px solid var(--border)' } : {}) });
@@ -781,7 +785,10 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={{ ...thBase, width: 16 }}></th>
+                  <th style={{ ...thBase, width: 16, cursor: 'pointer' }} title={allCollapsed ? 'Alle ausklappen' : 'Alle einklappen'}
+                    onClick={() => setCollapsedLanes(allCollapsed ? new Set() : new Set(allLanes.map(l => l.item.id)))}>
+                    <span style={{ fontSize: 10, opacity: 0.5, display: 'inline-block', transform: allCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>▼</span>
+                  </th>
                   <th style={{ ...thBase }}>Aktivität</th>
                   <th style={{ ...thBase }}>Start</th>
                   <th style={{ ...thBase }}>Ende</th>
@@ -790,11 +797,14 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
                 </tr>
               </thead>
               <tbody>
-                {allLanes.map((lane, laneIdx) => (<React.Fragment key={lane.item.id}>
-                  <tr>
+                {allLanes.map((lane, laneIdx) => { const isCollapsed = collapsedLanes.has(lane.item.id); return (<React.Fragment key={lane.item.id}>
+                  <tr onClick={() => toggleLane(lane.item.id)} style={{ cursor: 'pointer' }}>
                     <td colSpan={colCount} style={{ ...laneHd(laneIdx) }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span>{lane.item.name} <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>({lane.activities.length})</span></span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 10, opacity: 0.5, transition: 'transform 0.15s', display: 'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
+                          {lane.item.name} <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>({lane.activities.length})</span>
+                        </span>
                         <button className="btn btn-sm" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, opacity: 0.75 }}
                           onClick={e => { e.stopPropagation(); copyTo('lane-' + lane.item.id, buildTodoList([lane])); }}
                           title="Diese Lane als Todo-Liste kopieren">
@@ -803,7 +813,7 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
                       </div>
                     </td>
                   </tr>
-                  {lane.activities.map(act => {
+                  {!isCollapsed && lane.activities.map(act => {
                     const dur = daysBetween(act.startDate, act.endDate) + 1;
                     const col = barColor(act);
                     return (
@@ -830,7 +840,7 @@ function ListView({ project, groupByDimId, colorByDimId, hiddenItems = EMPTY_SET
                       </tr>
                     );
                   })}
-                </React.Fragment>))}
+                </React.Fragment>); })}
                 {milestones.length > 0 && <React.Fragment>
                   <tr><td colSpan={colCount} style={{ ...laneHd(allLanes.length) }}>Meilensteine ({milestones.length})</td></tr>
                   {milestones.map(ms => <tr key={ms.id}>
